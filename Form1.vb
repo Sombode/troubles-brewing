@@ -8,6 +8,9 @@ Imports System.Drawing.Imaging
 Imports System.Drawing.Text
 Imports System.IO 'TODO: Remove when no more debug is needed (haha...)
 
+' PROGRESS MARK: Implement day system?
+' TODO: (Polish) Change mouse pointer on context
+
 Public Class Form1
 
     Public gameObjects As LinkedList(Of gameObject) ' The main list of game objects (to loop through and tick/render them)
@@ -33,7 +36,7 @@ Public Class Form1
         pfc.AddFontFile(Application.StartupPath.Replace("bin\Debug", "Resources\GermaniaOne-Regular.ttf")) ' An objectively bad way to import a custom font,
         ' but it works (as long as the project stays unpackaged) and I don't have to touch pointers (the alternative is AddMemoryFont, which is too complex).
         debugFont = New Font(pfc.Families(0), 14)
-        money.setValue(1000000) ' obviously TEMP
+        money.setValue(500) ' temp?
     End Sub
 
     Private Sub tick()
@@ -100,8 +103,10 @@ Public Class Form1
 
         outline.LineJoin = LineJoin.Round
 
+        money.updateValue()
+
         e.Graphics.DrawImage(coin, New Rectangle(5, Height - coin.Height - 5, coin.Width, coin.Height))
-        outlineText(e.Graphics, FormatCurrency(money.getValue()), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(90, Height - 50), StringAlignment.Near)
+        outlineText(e.Graphics, FormatCurrency(money.getValue(), 0), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(90, Height - 50), StringAlignment.Near)
 
         If (MouseButtons = MouseButtons.Left) Then mouseLock = True
 
@@ -259,7 +264,7 @@ Public Class animatedValue ' An object that can interpolate between two values f
         value = startValue
     End Sub
 
-    Public Function getValue() As Single
+    Public Function updateValue() As Single
         If frame >= duration Then Return value
         frame += 1
         value = originalValue + (difference * (frame / duration)) ' (frame / duration) provides a t from 0 to 1 (the whole progression of the animation),
@@ -267,7 +272,7 @@ Public Class animatedValue ' An object that can interpolate between two values f
         Return value
     End Function
 
-    Public Function rawValue() As Single
+    Public Function getValue() As Single
         Return value
     End Function
 
@@ -287,6 +292,7 @@ Public Class animatedValue ' An object that can interpolate between two values f
     End Sub
 
     Public Sub addValue(number As Single)
+        If frame < duration Then value = targetValue ' In case the function is spammed added values don't get lost in transition
         originalValue = value
         difference = number
         targetValue = value + difference
@@ -300,6 +306,7 @@ Public Class potion
 
     Dim potionColor() As Single
     Dim recipe(0 To 2, 0 To 3) As Integer
+    Dim bonusValue As Integer
     Dim selectedOrder As order
 
     Public Sub New(x As Integer, y As Integer)
@@ -320,13 +327,14 @@ Public Class potion
         ' TODO: Remove unecessary constructors
     End Sub
 
-    Public Sub New(x As Integer, y As Integer, offset As Point, recipe As Integer(,))
+    Public Sub New(x As Integer, y As Integer, offset As Point, recipe As Integer(,), bonusValue As Integer)
         MyBase.New(x, y)
         grabbed = True
         Form1.grabLock = True
         grabOffset = offset
         sprite = My.Resources.PotionBase
         Me.recipe = recipe
+        Me.bonusValue = bonusValue
         selectedOrder = Nothing
 
         ' "Hashes" the potion color based on its ingredients
@@ -385,11 +393,15 @@ Public Class potion
         If Not IsNothing(selectedOrder) Then
             ' Selling a potion
             If Form1.concatRecipe(recipe) = Form1.concatRecipe(selectedOrder.recipe) Then
-                Form1.money.addValue(1000)
-            Else
-                Form1.money.addValue(-1000)
+                Dim ingredientCount = 0
+                For stage = 0 To 2
+                    For ingredient = 0 To 3
+                        ingredientCount += recipe(stage, ingredient)
+                    Next
+                Next
+                Form1.money.addValue(ingredientCount * 20 + bonusValue)
             End If
-            Form1.deadObjects.AddLast(selectedOrder)
+            selectedOrder.endOrder()
             Form1.deadObjects.AddLast(Me)
         End If
     End Sub
@@ -481,8 +493,7 @@ Public Class cauldron
 
     Private Function getBrewTime() As Integer
         If brewStage = -1 Then Return -1
-        Dim timeSpan As TimeSpan = DateTime.Now.TimeOfDay - brewStart.TimeOfDay
-        Return timeSpan.TotalMilliseconds
+        Return (DateTime.Now.TimeOfDay - brewStart.TimeOfDay).TotalMilliseconds
     End Function
 
     Public Overrides Sub tick()
@@ -501,7 +512,7 @@ Public Class cauldron
     Public Overrides Sub render(g As Graphics)
         MyBase.render(g)
 
-        ' Constants consistently used for rendering
+        ' Constants used for rendering
         Dim darkBrush As SolidBrush = New SolidBrush(Color.FromArgb(200, 10, 10, 10))
         Dim lightBrush As SolidBrush = New SolidBrush(Color.FromArgb(200, 200, 200, 200))
         Dim centerX As Integer = x + CInt(getBounds().Width / 2)
@@ -550,10 +561,10 @@ Public Class cauldron
                     If mouseAngle < 0 And mouseAngle > -Math.PI Then
                         Form1.cleanArc(g, lightBrush, centerX, centerY + 5, 225, 75, 0, 180)
                         If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then
-                            ' TODO: Add code to actually make the QTE matter to potion quality
-                            Form1.newObjects.AddFirst(New potion(Form1.MousePosition.X - 50, Form1.MousePosition.Y - 50, New Point(-50, -50), recipe))
-                            ' Resetting the cauldron's state
-                            recipe = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}
+                            Form1.newObjects.AddFirst(New potion(Form1.MousePosition.X - 50, Form1.MousePosition.Y - 50, New Point(-50, -50), recipe,
+                                                                 CInt(20 - Math.Abs(90 - CDec(Math.Abs(180 - ((getBrewTime() / 5) Mod 360)))) / 9 * 2)))
+                            ' Bonus money is calculated by getting the absolute difference between the current arrow's angle and 90 (the center), then putting it between 0 and 20
+                            recipe = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}} ' Resetting the cauldron's state
                             potionMenuActive = False
                             brewStage = -1
                             ingredientHistory.Clear()
@@ -611,6 +622,7 @@ Public Class cauldron
 
                 If potionMenuActive Then
                     g.DrawImage(My.Resources.CancelIcon, New Rectangle(centerX - 29, centerY - 29, 60, 60))
+                    g.DrawImage(My.Resources.PotionIcon, New Rectangle(centerX - 29, centerY + 46, 60, 60))
                 Else
                     g.DrawImage(My.Resources.PotionIcon, New Rectangle(centerX - 29, centerY - 29, 60, 60))
                 End If
@@ -631,7 +643,9 @@ Public Class order
     Inherits draggable
 
     Public potionHover As Boolean
-    Dim orderOpen As Boolean ' Kept independently of potion-hovering effects (which can temporarily open an order)
+    Dim timerStart As DateTime
+    Dim duration As Integer = 100000
+    Dim orderOpen, done As Boolean ' Kept independently of potion-hovering effects (which can temporarily open an order)
     Dim maxHeight As Integer
     Dim orderHeight As animatedValue = New animatedValue()
     Public recipe(0 To 2, 0 To 3) As Integer
@@ -640,19 +654,33 @@ Public Class order
         MyBase.New(x, y)
         sprite = My.Resources.PaperRoll
         orderHeight.snapValue(40)
+        orderHeight.duration = 2
         orderOpen = False
         potionHover = False
+        done = False
         Randomize()
         recipe = {{Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)},
             {Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)},
             {Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)}}
+        timerStart = DateTime.Now
+    End Sub
+
+    Public Sub endOrder()
+        done = True
+        orderHeight.duration = 5
+        orderHeight.setValue(0)
     End Sub
 
     Public Function getPaperRect() As Rectangle
         Return New Rectangle(x + 3, y + 19, My.Resources.OrderBackground.Width, orderHeight.getValue())
     End Function
 
+    Private Function getTimer() As Integer
+        Return (DateTime.Now.TimeOfDay - timerStart.TimeOfDay).TotalMilliseconds
+    End Function
+
     Public Overrides Sub tick()
+        If done Then Return
         MyBase.tick()
         If Not grabbed AndAlso Not Form1.mouseLock AndAlso
             New Rectangle(x, y + orderHeight.getValue(), sprite.Width, sprite.Height).Contains(Form1.MousePosition) And
@@ -660,16 +688,10 @@ Public Class order
 
             orderOpen = Not orderOpen
         End If
-        If potionHover Then
-            orderHeight.duration = 5
+        If potionHover Or orderOpen Then
             orderHeight.setValue(275)
         Else
-            orderHeight.duration = 10
-            If orderOpen Then
-                orderHeight.setValue(275)
-            Else
-                orderHeight.setValue(40)
-            End If
+            orderHeight.setValue(40)
         End If
     End Sub
 
@@ -681,6 +703,8 @@ Public Class order
         Dim textPen As Pen = New Pen(Color.Black, 5)
         textPen.LineJoin = LineJoin.Bevel ' Fixes a glitch where the 1 and 4 glyphs are shaped in such a way that the corners create sharp spikes ("thorns") by rounding corners
         ' https://stackoverflow.com/questions/44683841/infinity-angles-on-sharp-corners-in-graphics
+
+        orderHeight.updateValue()
 
         g.FillRectangle(New SolidBrush(Color.FromArgb(201, 162, 103)), getPaperRect())
 
@@ -710,12 +734,20 @@ Public Class order
 
         MyBase.render(g)
 
-        Form1.cleanArc(g, Brushes.MediumPurple, x + sprite.Width / 2, y + 8 + sprite.Height / 2, 33, 21, 180, 90)
+        Dim timerBrush As SolidBrush = New SolidBrush(Color.FromArgb(148, 72, 208))
 
-        If potionHover And orderHeight.getValue > 274 Then g.DrawImage(My.Resources.SellOverlay, New Rectangle(x, y, sprite.Width, sprite.Height + 275))
+        Form1.cleanArc(g, timerBrush, x + sprite.Width / 2, y + 8 + sprite.Height / 2, 33, 21, 180, Math.Min(getTimer() / duration * 180, 180))
+
+        If getTimer() - 3000 > duration Then endOrder()
+
+        timerBrush.Dispose()
+
+        If potionHover And orderHeight.getValue() > 274 Then g.DrawImage(My.Resources.SellOverlay, New Rectangle(x, y, sprite.Width, sprite.Height + 275))
 
         textBrush.Dispose()
         textPen.Dispose()
+
+        If done AndAlso orderHeight.getValue() < 1 Then Form1.deadObjects.AddLast(Me)
     End Sub
 
 End Class
