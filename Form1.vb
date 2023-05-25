@@ -44,7 +44,7 @@ Public Class Form1
     End Sub
 
     Private Sub Button1_Click(sender As Object, e As EventArgs) Handles Button1.Click
-        End
+        Close()
     End Sub
 
     Private Sub Form1_Paint(sender As Object, e As PaintEventArgs) Handles Me.Paint
@@ -356,10 +356,10 @@ Public Class potion
             selectedOrder = Nothing ' https://learn.microsoft.com/en-us/dotnet/visual-basic/language-reference/nothing
             For Each order In Form1.gameObjects.OfType(Of order)
                 order.potionHover = False
-                If order.getPaperRect().Contains(Form1.MousePosition) Then
+                If IsNothing(selectedOrder) AndAlso order.getPaperRect().Contains(Form1.MousePosition) Then
                     selectedOrder = order
                     order.potionHover = True
-                    Exit For
+                    ' Not just exiting the loop here as other orders need to have potionHover reset
                 End If
             Next
         End If
@@ -432,7 +432,7 @@ Public Class cauldron
 
     Dim brewStart As DateTime
     Dim potionMenuActive As Boolean
-    Dim totalTime As Integer = 30000
+    Dim totalTime As Integer = 10000
     Dim brewStage As Integer ' -1 for no brew, 0 for green, 1 for yellow, 2 for red
     Dim ingredientHistory As LinkedList(Of Integer())
     Dim recipe(0 To 2, 0 To 3) As Integer
@@ -450,11 +450,18 @@ Public Class cauldron
         brewStage = -1
     End Sub
 
-    Private Sub checkStartBrew() ' Small sub to check if a cauldron is empty to start brewing once an ingredient is added
-        If brewStage = -1 AndAlso recipe(0, 0) + recipe(0, 1) + recipe(0, 2) + recipe(0, 3) = 0 Then ' Adding up the values of the first four items
-            brewStart = DateTime.Now    ' to effectively check if they all equal 0 (otherwise the sum is not 0). Only checking the first 4 as brewing
-            brewStage = 0               ' does not start at any other stage (slightly more efficient than just calling and using concatRecipe())
+    Private Sub addIngredient(ingredient As Integer)
+        If brewStage = -1 AndAlso recipe(0, 0) + recipe(0, 1) + recipe(0, 2) + recipe(0, 3) = 0 Then
+            ' Starts the brewing timer if this is the first ingredeitn added
+            ' Adding up the values of the first four items to effectively check if they all equal 0 (otherwise the sum is not 0).
+            brewStart = DateTime.Now
+            brewStage = 0
         End If
+        recipe(brewStage, ingredient) += 1
+        Form1.money.addValue(-10)
+        Dim brewingAngle As Single = Math.Min(getBrewTime() * 180 / totalTime, 180) * Math.PI / 180 ' Same calculation as for the brew dial (with a lower bound), but converted to radians
+        ingredientHistory.AddLast({ingredient, Math.Cos(brewingAngle) * -155, Math.Sin(brewingAngle) * 155})
+        ' Stores the ingredient type, and the x and y (calculated from sine and cosine) (will be offset to center by cauldron at render)
     End Sub
 
     Private Function getBrewTime() As Integer
@@ -463,17 +470,18 @@ Public Class cauldron
         Return timeSpan.TotalMilliseconds
     End Function
 
-    Private Sub cleanArc(g As Graphics, brush As Brush, x As Integer, y As Integer, outer As Integer, inner As Integer, startAngle As Integer, sweepAngle As Integer)
+    Private Function cleanArc(g As Graphics, brush As Brush, x As Integer, y As Integer, outer As Integer, inner As Integer, startAngle As Integer, sweepAngle As Integer) As GraphicsPath
         ' Alternative to g.drawArc, but without misplaced endcaps (drawing an arc from 0 to 180 would not result in a flat edges on the semicircle)
         ' https://stackoverflow.com/questions/36096759/how-to-draw-a-circular-progressbar-pie-using-graphicspath-in-winform
         Dim arcPath As GraphicsPath = New GraphicsPath()
         With arcPath
-            .AddArc(New Rectangle(CInt(x - outer / 2), CInt(y - outer / 2), outer, outer), startAngle, sweepAngle) ' Outer edge of the arc
-            .AddArc(New Rectangle(CInt(x - inner / 2), CInt(y - inner / 2), inner, inner), startAngle + sweepAngle, -sweepAngle) ' Inner edge of the arc
+            .AddArc(New Rectangle((x - outer / 2), (y - outer / 2), outer, outer), startAngle, sweepAngle) ' Outer edge of the arc
+            .AddArc(New Rectangle((x - inner / 2), (y - inner / 2), inner, inner), startAngle + sweepAngle, -sweepAngle) ' Inner edge of the arc
             .CloseFigure()
         End With
         g.FillPath(brush, arcPath)
-    End Sub
+        Return arcPath ' Returns the path in case further action is taken (outlined with pen, etc.)
+    End Function
 
     Private Sub outlineText(g As Graphics, text As String, font As FontFamily, fontSize As Single, fill As SolidBrush, outline As Pen, position As Point)
         ' https://stackoverflow.com/questions/40310546/how-to-add-text-outline-to-button-text
@@ -558,6 +566,7 @@ Public Class cauldron
                             recipe = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}
                             potionMenuActive = False
                             brewStage = -1
+                            ingredientHistory.Clear()
                         End If
                     End If
                 End If
@@ -574,49 +583,42 @@ Public Class cauldron
                     g.DrawString(Str(mouseAngle), Form1.debugFont, New SolidBrush(Color.Black), New Point(10, 130))
                     If mouseAngle <= (Math.PI / 4) And mouseAngle >= (-Math.PI / 4) Then ' Left Section (Crystal)
                         cleanArc(g, lightBrush, centerX, centerY, 225, 75, 135, 90)
-                        If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then
-                            checkStartBrew()
-                            recipe(brewStage, 3) += 1
-                            ingredientHistory.AddLast({3, CInt(Math.Min(getBrewTime() * 180 / totalTime, 190))})
-                        End If
+                        If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then addIngredient(3)
                     ElseIf mouseAngle > (Math.PI / 4) And mouseAngle < (3 * Math.PI / 4) Then ' Top Section (Shroom)
                         cleanArc(g, lightBrush, centerX, centerY, 225, 75, 225, 90)
-                        If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then
-                            checkStartBrew()
-                            recipe(brewStage, 0) += 1
-                            ingredientHistory.AddLast({0, CInt(Math.Min(getBrewTime() * 180 / totalTime, 190))})
-                        End If
+                        If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then addIngredient(0)
                     ElseIf mouseAngle >= (3 * Math.PI / 4) Or mouseAngle <= (-3 * Math.PI / 4) Then ' Right Section (Herb)
                         cleanArc(g, lightBrush, centerX, centerY, 225, 75, -45, 90)
-                        If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then
-                            checkStartBrew()
-                            recipe(brewStage, 1) += 1
-                            ingredientHistory.AddLast({1, CInt(Math.Min(getBrewTime() * 180 / totalTime, 190))})
-                        End If
+                        If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then addIngredient(1)
                     ElseIf mouseAngle < (-Math.PI / 4) And mouseAngle > (-3 * Math.PI / 4) Then ' Bottom Section (Eye)
                         cleanArc(g, lightBrush, centerX, centerY, 225, 75, 45, 90)
-                        If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then
-                            checkStartBrew()
-                            recipe(brewStage, 2) += 1
-                            ingredientHistory.AddLast({2, CInt(Math.Min(getBrewTime() * 180 / totalTime, 190))})
-                        End If
+                        If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then addIngredient(2)
                     End If
                 End If
                 g.DrawImage(My.Resources.Shroom, New Rectangle(centerX - 30, centerY - 105, 60, 60))
                 g.DrawImage(My.Resources.Herb, New Rectangle(centerX + 45, centerY - 30, 60, 60))
                 g.DrawImage(My.Resources.Eye, New Rectangle(centerX - 30, centerY + 45, 60, 60))
                 g.DrawImage(My.Resources.Crystal, New Rectangle(centerX - 105, centerY - 30, 60, 60))
-
-                ' Ingredient history
-
-                cleanArc(g, New SolidBrush(Color.Green), centerX, centerY, 325, 300, 120, 60)
-                cleanArc(g, New SolidBrush(Color.Yellow), centerX, centerY, 325, 300, 60, 60)
-                cleanArc(g, New SolidBrush(Color.Red), centerX, centerY, 325, 300, 0, 60)
-
-                ' PROGRESS MARKER: Ingredients and angles are stored in ingredient history, render them here
-
             End If
             If Not brewStage = -1 Then
+
+                ' Rendering the ingredient history
+
+                Dim historyPen As Pen = New Pen(Color.Black, 10)
+
+                g.DrawPath(historyPen, cleanArc(g, Brushes.Black, centerX, centerY, 325, 300, -5, 190))
+
+                historyPen.Dispose()
+
+                cleanArc(g, New SolidBrush(Color.FromArgb(117, 200, 100)), centerX, centerY, 325, 300, 120, 65)
+                cleanArc(g, New SolidBrush(Color.FromArgb(240, 201, 61)), centerX, centerY, 325, 300, 60, 60)
+                cleanArc(g, New SolidBrush(Color.FromArgb(196, 76, 68)), centerX, centerY, 325, 300, -5, 65)
+
+                For Each ingredient In ingredientHistory
+                    g.DrawImage({My.Resources.Shroom, My.Resources.Herb, My.Resources.Eye, My.Resources.Crystal}(ingredient(0)),
+                                New Rectangle(centerX + ingredient(1) - 15, centerY + ingredient(2) - 15, 30, 30))
+                Next
+
                 If potionMenuActive Then
                     g.DrawImage(My.Resources.CancelIcon, New Rectangle(centerX - 29, centerY - 29, 60, 60))
                 Else
@@ -651,7 +653,9 @@ Public Class order
         orderOpen = False
         potionHover = False
         Randomize()
-        recipe = {{Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)}, {Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)}, {Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)}}
+        recipe = {{Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)},
+            {Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)},
+            {Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)}}
     End Sub
 
     Public Function getPaperRect() As Rectangle
@@ -667,7 +671,7 @@ Public Class order
             orderOpen = Not orderOpen
         End If
         If potionHover Then
-            orderHeight.duration = 3
+            orderHeight.duration = 5
             orderHeight.setValue(275)
         Else
             orderHeight.duration = 10
@@ -688,10 +692,9 @@ Public Class order
         textPen.LineJoin = LineJoin.Bevel ' Fixes a glitch where the 1 and 4 glyphs are shaped in such a way that the corners create sharp spikes ("thorns") by rounding corners
         ' https://stackoverflow.com/questions/44683841/infinity-angles-on-sharp-corners-in-graphics
 
-        g.SetClip(getPaperRect())
+        g.FillRectangle(New SolidBrush(Color.FromArgb(201, 162, 103)), getPaperRect())
 
-        g.FillRectangle(New SolidBrush(Color.FromArgb(201, 162, 103)), New Rectangle(x, y + 19, My.Resources.OrderBackground.Width, 300)) ' Renders a blank background if the orderBg 
-        ' sprite does not render in time with opening a recipe
+        g.SetClip(getPaperRect())
 
         If orderHeight.getValue() > 50 Then
             g.DrawImage(bg, New Rectangle(x, y + 19, bg.Width, bg.Height))

@@ -180,5 +180,11 @@
   <ItemGroup>
     <None Include="Resources\Coin.png" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\Frame 26.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\Icon.ico" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
 </Project>
