@@ -124,6 +124,13 @@ Public Class Form1
         Return output.Substring(0, output.Length - 1) ' Remove the last comma in the output
     End Function
 
+    Public Sub moveToFront(gameObj As gameObject) ' Moves an object to the front of its layer (based on type) by removing it from the list but readding it to the front
+        newObjects.AddLast(gameObj) ' Adding to the back of the list so that all objects added are moved to the front in the right order (objects moved last are in front)
+        deadObjects.AddLast(gameObj)
+    End Sub
+
+    ' Useful paint functions
+
     Public Sub outlineText(g As Graphics, text As String, font As FontFamily, fontSize As Single, fill As SolidBrush, outline As Pen, position As Point, alignment As Integer)
         ' Creates outlined text https://stackoverflow.com/questions/40310546/how-to-add-text-outline-to-button-text
         Dim textPath As GraphicsPath = New GraphicsPath()
@@ -135,10 +142,18 @@ Public Class Form1
         g.FillPath(fill, textPath)
     End Sub
 
-    Public Sub moveToFront(gameObj As gameObject) ' Moves an object to the front of its layer (based on type) by removing it from the list but readding it to the front
-        newObjects.AddLast(gameObj) ' Adding to the back of the list so that all objects added are moved to the front in the right order (objects moved last are in front)
-        deadObjects.AddLast(gameObj)
-    End Sub
+    Public Function cleanArc(g As Graphics, brush As Brush, x As Single, y As Single, outer As Integer, inner As Integer, startAngle As Integer, sweepAngle As Integer) As GraphicsPath
+        ' Alternative to g.drawArc, but without misplaced endcaps (drawing an arc from 0 to 180 would not result in a flat edges on the semicircle)
+        ' https://stackoverflow.com/questions/36096759/how-to-draw-a-circular-progressbar-pie-using-graphicspath-in-winform
+        Dim arcPath As GraphicsPath = New GraphicsPath()
+        With arcPath
+            .AddArc(New Rectangle((x - outer / 2), (y - outer / 2), outer, outer), startAngle, sweepAngle) ' Outer edge of the arc
+            .AddArc(New Rectangle((x - inner / 2), (y - inner / 2), inner, inner), startAngle + sweepAngle, -sweepAngle) ' Inner edge of the arc
+            .CloseFigure()
+        End With
+        g.FillPath(brush, arcPath)
+        Return arcPath ' Returns the path in case further action is taken (outlined with pen, etc.)
+    End Function
 
 End Class
 
@@ -470,30 +485,6 @@ Public Class cauldron
         Return timeSpan.TotalMilliseconds
     End Function
 
-    Private Function cleanArc(g As Graphics, brush As Brush, x As Integer, y As Integer, outer As Integer, inner As Integer, startAngle As Integer, sweepAngle As Integer) As GraphicsPath
-        ' Alternative to g.drawArc, but without misplaced endcaps (drawing an arc from 0 to 180 would not result in a flat edges on the semicircle)
-        ' https://stackoverflow.com/questions/36096759/how-to-draw-a-circular-progressbar-pie-using-graphicspath-in-winform
-        Dim arcPath As GraphicsPath = New GraphicsPath()
-        With arcPath
-            .AddArc(New Rectangle((x - outer / 2), (y - outer / 2), outer, outer), startAngle, sweepAngle) ' Outer edge of the arc
-            .AddArc(New Rectangle((x - inner / 2), (y - inner / 2), inner, inner), startAngle + sweepAngle, -sweepAngle) ' Inner edge of the arc
-            .CloseFigure()
-        End With
-        g.FillPath(brush, arcPath)
-        Return arcPath ' Returns the path in case further action is taken (outlined with pen, etc.)
-    End Function
-
-    Private Sub outlineText(g As Graphics, text As String, font As FontFamily, fontSize As Single, fill As SolidBrush, outline As Pen, position As Point)
-        ' https://stackoverflow.com/questions/40310546/how-to-add-text-outline-to-button-text
-        Dim textPath As GraphicsPath = New GraphicsPath()
-        outline.LineJoin = LineJoin.Bevel
-        ' Fixes a glitch where the 1 and 4 glyphs are shaped in such a way that the corners create sharp spikes ("thorns") by rounding corners
-        ' https://stackoverflow.com/questions/44683841/infinity-angles-on-sharp-corners-in-graphics
-        textPath.AddString(text, font, 0, fontSize, position, StringFormat.GenericDefault)
-        g.DrawPath(outline, textPath)
-        g.FillPath(fill, textPath)
-    End Sub
-
     Public Overrides Sub tick()
         MyBase.tick()
         If Not brewStage = -1 Then
@@ -530,7 +521,6 @@ Public Class cauldron
 
         ' Rendering debug stats
         'g.DrawString(concatRecipe(), Form1.debugFont, New SolidBrush(Color.Black), New Point(x + 260, y))
-        outlineText(g, Form1.concatRecipe(recipe), Form1.pfc.Families(0), 24, New SolidBrush(Color.White), New Pen(Color.Black, 6), New Point(x + 260, y))
         g.DrawString(Str(getBrewTime()), Form1.debugFont, New SolidBrush(Color.Black), New Point(x + 260, y + 40))
         g.DrawString(Str(brewStage), Form1.debugFont, New SolidBrush(Color.Black), New Point(x + 260, y + 80))
 
@@ -545,20 +535,20 @@ Public Class cauldron
                 ' this event will be known as a QTE in the code (quicktime event, probably a misnomer)
 
                 ' The bottom half of the circle (actual button where the player clicks to bottle a potion)
-                cleanArc(g, darkBrush, centerX, centerY + 5, 225, 75, 0, 180)
+                Form1.cleanArc(g, darkBrush, centerX, centerY + 5, 225, 75, 0, 180)
 
                 ' The top half of the circle (the actual QTE with the arrow) (halves are offset in height to avoid overlap)
-                cleanArc(g, darkBrush, centerX, centerY - 5, 225, 75, -180, 180)
-                cleanArc(g, New SolidBrush(Color.FromArgb(100, 30, 30, 30)), centerX, centerY - 5, 225, 75, -180, 180)
-                cleanArc(g, New SolidBrush(Color.FromArgb(100, 70, 70, 70)), centerX, centerY - 5, 225, 75, -135, 90)
-                cleanArc(g, New SolidBrush(Color.FromArgb(100, 110, 110, 110)), centerX, centerY - 5, 225, 75, -105, 30)
+                Form1.cleanArc(g, darkBrush, centerX, centerY - 5, 225, 75, -180, 180)
+                Form1.cleanArc(g, New SolidBrush(Color.FromArgb(100, 30, 30, 30)), centerX, centerY - 5, 225, 75, -180, 180)
+                Form1.cleanArc(g, New SolidBrush(Color.FromArgb(100, 70, 70, 70)), centerX, centerY - 5, 225, 75, -135, 90)
+                Form1.cleanArc(g, New SolidBrush(Color.FromArgb(100, 110, 110, 110)), centerX, centerY - 5, 225, 75, -105, 30)
                 ' The different arcs represent the different "regions" of the circle, increasingly narrow to the center
 
                 If mouseDist > 40 And mouseDist < 110 Then
                     Dim mouseAngle = Math.Atan2(y + 100 - Form1.MousePosition.Y, x + 125 - Form1.MousePosition.X)
                     g.DrawString(Str(mouseAngle), Form1.debugFont, New SolidBrush(Color.Black), New Point(10, 130))
                     If mouseAngle < 0 And mouseAngle > -Math.PI Then
-                        cleanArc(g, lightBrush, centerX, centerY + 5, 225, 75, 0, 180)
+                        Form1.cleanArc(g, lightBrush, centerX, centerY + 5, 225, 75, 0, 180)
                         If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then
                             ' TODO: Add code to actually make the QTE matter to potion quality
                             Form1.newObjects.AddFirst(New potion(Form1.MousePosition.X - 50, Form1.MousePosition.Y - 50, New Point(-50, -50), recipe))
@@ -571,27 +561,27 @@ Public Class cauldron
                     End If
                 End If
 
-                cleanArc(g, New SolidBrush(Color.FromArgb(255, 200, 200, 200)), centerX, centerY - 5, 225, 75, -CDec(Math.Abs(180 - ((getBrewTime() / 5) Mod 360))) - 3, 6)
+                Form1.cleanArc(g, New SolidBrush(Color.FromArgb(255, 200, 200, 200)), centerX, centerY - 5, 225, 75, -CDec(Math.Abs(180 - ((getBrewTime() / 5) Mod 360))) - 3, 6)
                 ' The QTE arrow is rendered as a small arc with a start angle that oscillates from -180 to 0 (by getting the absolute difference between 180
                 ' time mod 360 so that it smoothly goes back and forth (0 and 360 will produce the same value, allowing for the transition to be seamless)
 
             Else
                 ' Rendering the ingredient wheel
-                cleanArc(g, darkBrush, centerX, centerY, 225, 75, 0, 360)
+                Form1.cleanArc(g, darkBrush, centerX, centerY, 225, 75, 0, 360)
                 If mouseDist > 40 And mouseDist < 110 Then
                     Dim mouseAngle = Math.Atan2(y + 100 - Form1.MousePosition.Y, x + 125 - Form1.MousePosition.X)
                     g.DrawString(Str(mouseAngle), Form1.debugFont, New SolidBrush(Color.Black), New Point(10, 130))
                     If mouseAngle <= (Math.PI / 4) And mouseAngle >= (-Math.PI / 4) Then ' Left Section (Crystal)
-                        cleanArc(g, lightBrush, centerX, centerY, 225, 75, 135, 90)
+                        Form1.cleanArc(g, lightBrush, centerX, centerY, 225, 75, 135, 90)
                         If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then addIngredient(3)
                     ElseIf mouseAngle > (Math.PI / 4) And mouseAngle < (3 * Math.PI / 4) Then ' Top Section (Shroom)
-                        cleanArc(g, lightBrush, centerX, centerY, 225, 75, 225, 90)
+                        Form1.cleanArc(g, lightBrush, centerX, centerY, 225, 75, 225, 90)
                         If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then addIngredient(0)
                     ElseIf mouseAngle >= (3 * Math.PI / 4) Or mouseAngle <= (-3 * Math.PI / 4) Then ' Right Section (Herb)
-                        cleanArc(g, lightBrush, centerX, centerY, 225, 75, -45, 90)
+                        Form1.cleanArc(g, lightBrush, centerX, centerY, 225, 75, -45, 90)
                         If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then addIngredient(1)
                     ElseIf mouseAngle < (-Math.PI / 4) And mouseAngle > (-3 * Math.PI / 4) Then ' Bottom Section (Eye)
-                        cleanArc(g, lightBrush, centerX, centerY, 225, 75, 45, 90)
+                        Form1.cleanArc(g, lightBrush, centerX, centerY, 225, 75, 45, 90)
                         If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then addIngredient(2)
                     End If
                 End If
@@ -606,13 +596,13 @@ Public Class cauldron
 
                 Dim historyPen As Pen = New Pen(Color.Black, 10)
 
-                g.DrawPath(historyPen, cleanArc(g, Brushes.Black, centerX, centerY, 325, 300, -5, 190))
+                g.DrawPath(historyPen, Form1.cleanArc(g, Brushes.Black, centerX, centerY, 325, 300, -5, 190))
 
                 historyPen.Dispose()
 
-                cleanArc(g, New SolidBrush(Color.FromArgb(117, 200, 100)), centerX, centerY, 325, 300, 120, 65)
-                cleanArc(g, New SolidBrush(Color.FromArgb(240, 201, 61)), centerX, centerY, 325, 300, 60, 60)
-                cleanArc(g, New SolidBrush(Color.FromArgb(196, 76, 68)), centerX, centerY, 325, 300, -5, 65)
+                Form1.cleanArc(g, New SolidBrush(Color.FromArgb(117, 200, 100)), centerX, centerY, 325, 300, 120, 65)
+                Form1.cleanArc(g, New SolidBrush(Color.FromArgb(240, 201, 61)), centerX, centerY, 325, 300, 60, 60)
+                Form1.cleanArc(g, New SolidBrush(Color.FromArgb(196, 76, 68)), centerX, centerY, 325, 300, -5, 65)
 
                 For Each ingredient In ingredientHistory
                     g.DrawImage({My.Resources.Shroom, My.Resources.Herb, My.Resources.Eye, My.Resources.Crystal}(ingredient(0)),
@@ -659,7 +649,7 @@ Public Class order
     End Sub
 
     Public Function getPaperRect() As Rectangle
-        Return New Rectangle(x, y + 19, My.Resources.OrderBackground.Width, orderHeight.getValue())
+        Return New Rectangle(x + 3, y + 19, My.Resources.OrderBackground.Width, orderHeight.getValue())
     End Function
 
     Public Overrides Sub tick()
@@ -697,15 +687,15 @@ Public Class order
         g.SetClip(getPaperRect())
 
         If orderHeight.getValue() > 50 Then
-            g.DrawImage(bg, New Rectangle(x, y + 19, bg.Width, bg.Height))
+            g.DrawImage(bg, New Rectangle(x + 3, y + 19, bg.Width, bg.Height))
             For h = 0 To 2 ' Iterating through brew stages (columns)
                 Dim emptyOffset As Integer = 0
                 For k = 0 To 3 ' Iterating (rendering) through all four ingredients (in a column)
                     If recipe(h, k) = 0 Then
                         emptyOffset += 1 ' If an ingredient shouldn't be added, shift back the y offset of all subsequent ingredients in the column by 1 (45)
                     Else
-                        g.DrawImage(ingredients(k), New Rectangle(x + 20 + 64 * h, y + 80 + 45 * (k - emptyOffset), 40, 40))
-                        Form1.outlineText(g, recipe(h, k), Form1.pfc.Families(0), 20, textBrush, textPen, New Point(x + 62.5 + 64 * h, y + 110 + 45 * (k - emptyOffset)), StringAlignment.Far)
+                        g.DrawImage(ingredients(k), New Rectangle(x + 23 + (64 * h), y + 80 + (45 * (k - emptyOffset)), 40, 40))
+                        Form1.outlineText(g, recipe(h, k), Form1.pfc.Families(0), 20, textBrush, textPen, New Point(x + 65.5 + (64 * h), y + 110 + (45 * (k - emptyOffset))), StringAlignment.Far)
                     End If
                 Next
             Next
@@ -719,6 +709,8 @@ Public Class order
         g.DrawImage(bottomRoll, New Rectangle(x, y + orderHeight.getValue(), sprite.Width, sprite.Height))
 
         MyBase.render(g)
+
+        Form1.cleanArc(g, Brushes.MediumPurple, x + sprite.Width / 2, y + 8 + sprite.Height / 2, 33, 21, 180, 90)
 
         If potionHover And orderHeight.getValue > 274 Then g.DrawImage(My.Resources.SellOverlay, New Rectangle(x, y, sprite.Width, sprite.Height + 275))
 
