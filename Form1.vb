@@ -16,6 +16,7 @@ Public Class Form1
     Public gameObjects As LinkedList(Of gameObject) ' The main list of game objects (to loop through and tick/render them)
     Public newObjects, deadObjects As LinkedList(Of gameObject) ' Lists that will be used to modify gameObjects after iteration (as the direct list cannot be modified during iteration)
     Public mouseLock, grabLock As Boolean
+    Public day As Integer
     Public money As animatedValue = New animatedValue()
     ' TODO: Do something about right clicks?
     ' TODO: (Polish) rolling list of transactions (class); moves up and fades out
@@ -37,6 +38,7 @@ Public Class Form1
         ' but it works (as long as the project stays unpackaged) and I don't have to touch pointers (the alternative is AddMemoryFont, which is too complex).
         debugFont = New Font(pfc.Families(0), 14)
         money.setValue(500) ' temp?
+        day = 1
     End Sub
 
     Private Sub tick()
@@ -91,11 +93,6 @@ Public Class Form1
 
         newObjects.Clear()
 
-        ' debug graphics
-        e.Graphics.DrawString(Str(MousePosition.X) + ", " + Str(MousePosition.Y), debugFont, New SolidBrush(Color.Black), New Point(10, 10))
-        e.Graphics.DrawString(Str(MouseButtons), debugFont, New SolidBrush(Color.Black), New Point(10, 50))
-        e.Graphics.DrawString(Str(mouseLock), debugFont, New SolidBrush(Color.Black), New Point(10, 170))
-
         ' Money display
 
         Dim coin As Image = My.Resources.Coin
@@ -109,6 +106,32 @@ Public Class Form1
         outlineText(e.Graphics, FormatCurrency(money.getValue(), 0), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(90, Height - 50), StringAlignment.Near)
 
         If (MouseButtons = MouseButtons.Left) Then mouseLock = True
+
+        ' Day display
+
+        Dim dayDial As Image = My.Resources.DayDial
+        Dim circleClip As GraphicsPath = New GraphicsPath()
+
+        circleClip.AddEllipse(New Rectangle(27, 27, 66, 65))
+
+        e.Graphics.DrawImage(dayDial, New Rectangle(10, 10, dayDial.Width, dayDial.Height))
+
+        e.Graphics.SetClip(circleClip)
+
+        Dim sun As Rectangle = New Rectangle(43, MousePosition.Y, 33, 33)
+        Dim sunBrush As SolidBrush = New SolidBrush(Color.FromArgb(240, 201, 61))
+        Dim sunPen As Pen = New Pen(Color.FromArgb(223, 177, 58), 5)
+
+        e.Graphics.FillEllipse(sunBrush, sun)
+
+        e.Graphics.DrawEllipse(sunPen, sun)
+
+        sunBrush.Dispose()
+        sunPen.Dispose()
+
+        e.Graphics.ResetClip()
+
+        outlineText(e.Graphics, "Day" + Str(day), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(110, 60), StringAlignment.Near)
 
         outline.Dispose()
 
@@ -530,16 +553,10 @@ Public Class cauldron
             g.ResetTransform()
         End If
 
-        ' Rendering debug stats
-        'g.DrawString(concatRecipe(), Form1.debugFont, New SolidBrush(Color.Black), New Point(x + 260, y))
-        g.DrawString(Str(getBrewTime()), Form1.debugFont, New SolidBrush(Color.Black), New Point(x + 260, y + 40))
-        g.DrawString(Str(brewStage), Form1.debugFont, New SolidBrush(Color.Black), New Point(x + 260, y + 80))
-
         If Form1.grabLock Then Return ' Don't render/handle cauldron interactions if something is grabbed/dragged
 
         If getBounds().Contains(Form1.MousePosition) Then
             Dim mouseDist = Math.Sqrt((centerX - Form1.MousePosition.X) ^ 2 + (centerY - Form1.MousePosition.Y) ^ 2)
-            g.DrawString(Str(mouseDist), Form1.debugFont, New SolidBrush(Color.Black), New Point(10, 90))
             If Not brewStage = -1 Then g.FillEllipse(darkBrush, centerX - 30, centerY - 30, 60, 60)
             If potionMenuActive Then
                 ' Rendering potion bottling event (a arrow bounces back and forth, timing the bottling correctly rewards extra money)
@@ -557,7 +574,6 @@ Public Class cauldron
 
                 If mouseDist > 40 And mouseDist < 110 Then
                     Dim mouseAngle = Math.Atan2(y + 100 - Form1.MousePosition.Y, x + 125 - Form1.MousePosition.X)
-                    g.DrawString(Str(mouseAngle), Form1.debugFont, New SolidBrush(Color.Black), New Point(10, 130))
                     If mouseAngle < 0 And mouseAngle > -Math.PI Then
                         Form1.cleanArc(g, lightBrush, centerX, centerY + 5, 225, 75, 0, 180)
                         If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then
@@ -581,7 +597,6 @@ Public Class cauldron
                 Form1.cleanArc(g, darkBrush, centerX, centerY, 225, 75, 0, 360)
                 If mouseDist > 40 And mouseDist < 110 Then
                     Dim mouseAngle = Math.Atan2(y + 100 - Form1.MousePosition.Y, x + 125 - Form1.MousePosition.X)
-                    g.DrawString(Str(mouseAngle), Form1.debugFont, New SolidBrush(Color.Black), New Point(10, 130))
                     If mouseAngle <= (Math.PI / 4) And mouseAngle >= (-Math.PI / 4) Then ' Left Section (Crystal)
                         Form1.cleanArc(g, lightBrush, centerX, centerY, 225, 75, 135, 90)
                         If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then addIngredient(3)
