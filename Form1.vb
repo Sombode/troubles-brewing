@@ -15,9 +15,13 @@ Public Class Form1
 
     Public gameObjects As LinkedList(Of gameObject) ' The main list of game objects (to loop through and tick/render them)
     Public newObjects, deadObjects As LinkedList(Of gameObject) ' Lists that will be used to modify gameObjects after iteration (as the direct list cannot be modified during iteration)
-    Public mouseLock, grabLock As Boolean
+    Public mouseLock, grabLock, night As Boolean
     Public day As Integer
-    Public money As animatedValue = New animatedValue()
+    Public money As animatedValue = New animatedValue(500)
+    Public dayTransition As animatedValue = New animatedValue(0)
+    Dim pendingOrders(3) As Integer
+    Dim dayStart As DateTime
+
     ' TODO: Do something about right clicks?
     ' TODO: (Polish) rolling list of transactions (class); moves up and fades out
 
@@ -25,20 +29,25 @@ Public Class Form1
     Public debugFont As Font
 
     Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        Randomize()
         gameObjects = New LinkedList(Of gameObject)
         newObjects = New LinkedList(Of gameObject)
         deadObjects = New LinkedList(Of gameObject)
         mouseLock = False
         grabLock = False
-        gameObjects.AddFirst(New order(800, 300))
-        gameObjects.AddFirst(New order(900, 500))
-        gameObjects.AddFirst(New order(1000, 700))
+        'gameObjects.AddFirst(New order(800, 300))
+        'gameObjects.AddFirst(New order(900, 500))
+        'gameObjects.AddFirst(New order(1000, 700))
         gameObjects.AddFirst(New cauldron(500, 500))
         pfc.AddFontFile(Application.StartupPath.Replace("bin\Debug", "Resources\GermaniaOne-Regular.ttf")) ' An objectively bad way to import a custom font,
         ' but it works (as long as the project stays unpackaged) and I don't have to touch pointers (the alternative is AddMemoryFont, which is too complex).
         debugFont = New Font(pfc.Families(0), 14)
-        money.setValue(500) ' temp?
         day = 1
+        night = False
+        dayStart = DateTime.Now
+        pendingOrders(0) = Math.Round(Rnd() * 3)
+        pendingOrders(1) = Math.Round(Rnd() * 2)
+        pendingOrders(2) = Math.Round(Rnd() * 1)
     End Sub
 
     Private Sub tick()
@@ -46,6 +55,24 @@ Public Class Form1
         For Each gameObj In gameObjects ' idea: combine tick and render into one loop? depends on interactions, would reduce iterations with more objects
             gameObj.tick()
         Next
+        If pendingOrders(0) > 0 And getDayTime() > 0 Then
+            For i = 0 To pendingOrders(0)
+                newObjects.AddLast(New order(i))
+            Next
+            pendingOrders(0) = 0
+        End If
+        If pendingOrders(1) > 0 And getDayTime() > 60000 Then
+            For i = 0 To pendingOrders(1)
+                newObjects.AddLast(New order(i))
+            Next
+            pendingOrders(1) = 0
+        End If
+        If pendingOrders(2) > 0 And getDayTime() > 120000 Then
+            For i = 0 To pendingOrders(2)
+                newObjects.AddLast(New order(i))
+            Next
+            pendingOrders(2) = 0
+        End If
     End Sub
 
     Private Sub Button1_Click(sender As Object, e As EventArgs) Handles Button1.Click
@@ -109,6 +136,8 @@ Public Class Form1
 
         ' Day display
 
+        dayTransition.updateValue()
+
         Dim dayDial As Image = My.Resources.DayDial
         Dim circleClip As GraphicsPath = New GraphicsPath()
 
@@ -118,20 +147,29 @@ Public Class Form1
 
         e.Graphics.SetClip(circleClip)
 
-        Dim sun As Rectangle = New Rectangle(43, MousePosition.Y, 33, 33)
-        Dim sunBrush As SolidBrush = New SolidBrush(Color.FromArgb(240, 201, 61))
-        Dim sunPen As Pen = New Pen(Color.FromArgb(223, 177, 58), 5)
-
-        e.Graphics.FillEllipse(sunBrush, sun)
-
-        e.Graphics.DrawEllipse(sunPen, sun)
-
-        sunBrush.Dispose()
-        sunPen.Dispose()
+        If night Then
+            Dim moon As Image = My.Resources.Moon
+            Dim nightBrush As SolidBrush = New SolidBrush(Color.FromArgb(CInt(dayTransition.getValue() / 20 * 255), 90, 69, 105))
+            e.Graphics.FillPath(nightBrush, circleClip)
+            e.Graphics.DrawImage(moon, New Rectangle(43, 93 - 50 * dayTransition.getValue() / 20, 33, 33))
+        Else
+            Dim sun As Rectangle = New Rectangle(43, 43 + getDayTime() / 100 * 5, 33, 33) ' Days last 3 minutes (180000 milliseconds), moving the sun down 50 pixels
+            Dim sunBrush As SolidBrush = New SolidBrush(Color.FromArgb(240, 201, 61))
+            Dim sunPen As Pen = New Pen(Color.FromArgb(223, 177, 58), 5)
+            e.Graphics.FillEllipse(sunBrush, sun)
+            e.Graphics.DrawEllipse(sunPen, sun)
+            sunBrush.Dispose()
+            sunPen.Dispose()
+            If getDayTime() > 2000 Then
+                night = True
+                dayTransition.setValue(20)
+                ' TODO: Night mode
+            End If
+        End If
 
         e.Graphics.ResetClip()
 
-        outlineText(e.Graphics, "Day" + Str(day), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(110, 60), StringAlignment.Near)
+        outlineText(e.Graphics, ("Day" + Str(day)), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(110, 60), StringAlignment.Near)
 
         outline.Dispose()
 
@@ -139,6 +177,10 @@ Public Class Form1
     End Sub
 
     ' Below are useful functions used by most other classes (thus consolidated into Form1 for ease of access)
+
+    Public Function getDayTime() As Integer
+        Return (DateTime.Now.TimeOfDay - dayStart.TimeOfDay).TotalMilliseconds
+    End Function
 
     Public Function concatRecipe(recipe As Integer(,)) As String ' A function to condense the recipe array into a workable object (string),
         ' which is easier to manipulate/compare; used throughout different classes
@@ -273,6 +315,7 @@ End Class
 Public Class animatedValue ' An object that can interpolate between two values for smooth transitions
 
     Public duration As Single
+    Public done As Boolean ' TODO: Refactor to use this more!
     Dim value, originalValue, difference, targetValue As Single
     Dim frame As Integer
 
@@ -288,7 +331,10 @@ Public Class animatedValue ' An object that can interpolate between two values f
     End Sub
 
     Public Function updateValue() As Single
-        If frame >= duration Then Return value
+        If frame >= duration Then
+            done = True
+            Return value
+        End If
         frame += 1
         value = originalValue + (difference * (frame / duration)) ' (frame / duration) provides a t from 0 to 1 (the whole progression of the animation),
         ' which is then scaled by the difference needed to cover
@@ -301,6 +347,7 @@ Public Class animatedValue ' An object that can interpolate between two values f
 
     Public Sub setValue(target As Single)
         If targetValue = target Then Return ' Do nothing if the value is already moving to the correct value
+        done = False
         originalValue = value
         difference = target - value
         targetValue = target
@@ -312,10 +359,12 @@ Public Class animatedValue ' An object that can interpolate between two values f
         value = target
         originalValue = target
         targetValue = target
+        done = True
     End Sub
 
     Public Sub addValue(number As Single)
         If frame < duration Then value = targetValue ' In case the function is spammed added values don't get lost in transition
+        done = False
         originalValue = value
         difference = number
         targetValue = value + difference
@@ -663,7 +712,43 @@ Public Class order
     Dim orderOpen, done As Boolean ' Kept independently of potion-hovering effects (which can temporarily open an order)
     Dim maxHeight As Integer
     Dim orderHeight As animatedValue = New animatedValue()
+    Dim dy As animatedValue = New animatedValue(-100)
+    Dim spawning As Boolean
     Public recipe(0 To 2, 0 To 3) As Integer
+
+    Public Sub New()
+        MyBase.New(1600, -100)
+        sprite = My.Resources.PaperRoll
+        orderHeight.snapValue(40)
+        orderHeight.duration = 2
+        orderOpen = False
+        potionHover = False
+        done = False
+        spawning = True
+        Randomize()
+        recipe = {{Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)},
+            {Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)},
+            {Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)}}
+        timerStart = DateTime.Now
+        dy.setValue(50)
+    End Sub
+
+    Public Sub New(offset As Integer)
+        MyBase.New(1600, -100)
+        sprite = My.Resources.PaperRoll
+        orderHeight.snapValue(40)
+        orderHeight.duration = 2
+        orderOpen = False
+        potionHover = False
+        done = False
+        spawning = True
+        Randomize()
+        recipe = {{Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)},
+            {Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)},
+            {Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)}}
+        timerStart = DateTime.Now
+        dy.setValue(50 + (offset * 90)) ' TODO: Slide in from right to left (just makes more sense really)
+    End Sub
 
     Public Sub New(x As Integer, y As Integer)
         MyBase.New(x, y)
@@ -673,6 +758,7 @@ Public Class order
         orderOpen = False
         potionHover = False
         done = False
+        spawning = False
         Randomize()
         recipe = {{Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)},
             {Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)},
@@ -695,6 +781,12 @@ Public Class order
     End Function
 
     Public Overrides Sub tick()
+        If spawning Then
+            dy.updateValue()
+            y = dy.getValue()
+            If dy.done Then spawning = False
+            Return
+        End If
         If done Then Return
         MyBase.tick()
         If Not grabbed AndAlso Not Form1.mouseLock AndAlso
