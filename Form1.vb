@@ -7,6 +7,7 @@ Imports System.Drawing.Drawing2D
 Imports System.Drawing.Imaging
 Imports System.Drawing.Text
 Imports System.IO 'TODO: Remove when no more debug is needed (haha...)
+Imports System.Runtime.InteropServices.ComTypes
 
 ' PROGRESS MARK: Implement day system?
 ' TODO: (Polish) Change mouse pointer on context
@@ -19,6 +20,8 @@ Public Class Form1
     Public day As Integer
     Public money As animatedValue = New animatedValue(500)
     Public dayTransition As animatedValue = New animatedValue(0)
+    Dim shopX As animatedValue = New animatedValue(0)
+    Dim shopOpen As Boolean
     Dim pendingOrders(3) As Integer
     Dim dayStart As DateTime
 
@@ -57,19 +60,19 @@ Public Class Form1
         Next
         If pendingOrders(0) > 0 And getDayTime() > 0 Then
             For i = 0 To pendingOrders(0)
-                newObjects.AddLast(New order(i))
+                newObjects.AddFirst(New order(i))
             Next
             pendingOrders(0) = 0
         End If
-        If pendingOrders(1) > 0 And getDayTime() > 60000 Then
+        If pendingOrders(1) > 0 And getDayTime() > 55000 Then
             For i = 0 To pendingOrders(1)
-                newObjects.AddLast(New order(i))
+                newObjects.AddFirst(New order(i))
             Next
             pendingOrders(1) = 0
         End If
-        If pendingOrders(2) > 0 And getDayTime() > 120000 Then
+        If pendingOrders(2) > 0 And getDayTime() > 110000 Then
             For i = 0 To pendingOrders(2)
-                newObjects.AddLast(New order(i))
+                newObjects.AddFirst(New order(i))
             Next
             pendingOrders(2) = 0
         End If
@@ -90,6 +93,10 @@ Public Class Form1
         ' it is faster to use the Graphics from the PaintEventArgs of the Paint event rather than CreateGraphics(), which removes any flickering when redrawing
 
         ' Iterating through specific types (using OfType(Of ...)) so that types of objects are properly layered when drawn (cauldrons then orders then potions)
+
+        For Each cauldron In gameObjects.OfType(Of editCauldron).Reverse()
+            cauldron.render(e.Graphics)
+        Next
 
         For Each cauldron In gameObjects.OfType(Of cauldron).Reverse() ' Reversing these lists when rendering for 2 key reasons:
             cauldron.render(e.Graphics)
@@ -132,8 +139,6 @@ Public Class Form1
         e.Graphics.DrawImage(coin, New Rectangle(5, Height - coin.Height - 5, coin.Width, coin.Height))
         outlineText(e.Graphics, FormatCurrency(money.getValue(), 0), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(90, Height - 50), StringAlignment.Near)
 
-        If (MouseButtons = MouseButtons.Left) Then mouseLock = True
-
         ' Day display
 
         dayTransition.updateValue()
@@ -152,6 +157,7 @@ Public Class Form1
             Dim nightBrush As SolidBrush = New SolidBrush(Color.FromArgb(CInt(dayTransition.getValue() / 20 * 255), 90, 69, 105))
             e.Graphics.FillPath(nightBrush, circleClip)
             e.Graphics.DrawImage(moon, New Rectangle(43, 93 - 50 * dayTransition.getValue() / 20, 33, 33))
+
         Else
             Dim sun As Rectangle = New Rectangle(43, 43 + getDayTime() / 100 * 5, 33, 33) ' Days last 3 minutes (180000 milliseconds), moving the sun down 50 pixels
             Dim sunBrush As SolidBrush = New SolidBrush(Color.FromArgb(240, 201, 61))
@@ -160,18 +166,83 @@ Public Class Form1
             e.Graphics.DrawEllipse(sunPen, sun)
             sunBrush.Dispose()
             sunPen.Dispose()
-            If getDayTime() > 2000 Then
+            If getDayTime() > 1000 Then
                 night = True
                 dayTransition.setValue(20)
                 ' TODO: Night mode
+                shopOpen = False
+                For Each obj In gameObjects
+                    If obj.GetType() = GetType(cauldron) Then
+                        ' Replaces cauldrons with a movable version of themselves during the night
+                        newObjects.AddLast(New editCauldron(obj))
+                        deadObjects.AddLast(obj)
+                        Return
+                    End If
+                    obj.kill()
+                Next
             End If
         End If
 
         e.Graphics.ResetClip()
 
-        outlineText(e.Graphics, ("Day" + Str(day)), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(110, 60), StringAlignment.Near)
+        If night Then
+            outlineText(e.Graphics, ("Night" + Str(day)), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(110, 60), StringAlignment.Near)
+
+            ' Shop UI
+
+            Dim darkBrush As SolidBrush = New SolidBrush(Color.FromArgb(200, 10, 10, 10))
+            Dim dimBrush As SolidBrush = New SolidBrush(Color.FromArgb(200, 180, 180, 180))
+            Dim lightBrush As SolidBrush = New SolidBrush(Color.FromArgb(255, 200, 200, 200))
+
+            Dim shopToggle As GraphicsPath = New GraphicsPath()
+
+            shopX.updateValue()
+
+            shopToggle.AddPie(New Rectangle(Width - 60 + shopX.getValue(), Height / 2 - 50, 100, 100), 90, 180)
+
+            If shopToggle.IsVisible(MousePosition) Then ' Essentially .contains(Point) for graphics paths https://stackoverflow.com/questions/4816297/how-to-know-if-a-graphicspath-contains-a-point-in-c-sharp
+                e.Graphics.FillPath(dimBrush, shopToggle)
+                If Not mouseLock AndAlso MouseButtons = MouseButtons.Left Then
+                    If shopOpen Then
+                        shopX.setValue(0)
+                    Else
+                        shopX.setValue(-300)
+                    End If
+                    shopOpen = Not shopOpen
+                End If
+            Else
+                e.Graphics.FillPath(darkBrush, shopToggle)
+            End If
+
+            e.Graphics.FillRectangle(lightBrush, New Rectangle(Width - 55 + shopX.getValue(), Height / 2 - 5, 40, 10))
+
+            If shopOpen Or Not shopX.done Then
+                Dim rockButton As Rectangle = New Rectangle(Width + 5 + shopX.getValue(), 17.5, 275, 250)
+                Dim ironButton As Rectangle = New Rectangle(Width + 5 + shopX.getValue(), 282.5, 275, 250)
+                Dim copperButton As Rectangle = New Rectangle(Width + 5 + shopX.getValue(), 547.5, 275, 250)
+                Dim goldButton As Rectangle = New Rectangle(Width + 5 + shopX.getValue(), 812.5, 275, 250)
+                For i = 0 To 3
+                    Dim button As Rectangle = New Rectangle(Width + 5 + shopX.getValue(), 17.5 + 265 * i, 275, 250)
+                    If button.Contains(MousePosition) Then
+                        e.Graphics.FillRectangle(dimBrush, button)
+                    Else
+                        e.Graphics.FillRectangle(darkBrush, button)
+                    End If
+                Next
+            Else
+                e.Graphics.FillRectangle(lightBrush, New Rectangle(Width - 40 + shopX.getValue(), Height / 2 - 20, 10, 40))
+            End If
+
+            darkBrush.Dispose()
+            dimBrush.Dispose()
+            lightBrush.Dispose()
+        Else
+            outlineText(e.Graphics, ("Day" + Str(day)), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(110, 60), StringAlignment.Near)
+        End If
 
         outline.Dispose()
+
+        If (MouseButtons = MouseButtons.Left) Then mouseLock = True
 
         Invalidate() ' Marks the form's area as "invalid" so that it will be redrawn
     End Sub
@@ -231,19 +302,32 @@ Public Class gameObject ' A basic class to be inherited by the main game objects
 
     Friend x, y As Integer
     Friend sprite As Image
+    Friend dead As Boolean
+    Dim deadY As animatedValue = New animatedValue() ' Used for the slide out animation when kill() is called
 
     Public Sub New(x As Integer, y As Integer)
         Me.x = x
         Me.y = y
+        dead = False
     End Sub
 
     Public Overridable Sub tick()
-
+        If dead Then
+            deadY.updateValue()
+            y = deadY.getValue()
+            If deadY.done Then Form1.deadObjects.AddLast(Me)
+        End If
     End Sub
 
     Public Overridable Function getBounds() As Rectangle
         Return New Rectangle(x, y, sprite.Width, sprite.Height)
     End Function
+
+    Public Overridable Sub kill()
+        dead = True
+        deadY.snapValue(y)
+        deadY.setValue(-100 - sprite.Height)
+    End Sub
 
     Public Overridable Sub render(g As Graphics)
 
@@ -278,6 +362,10 @@ Public Class draggable ' A class based off of gameObject with additional functio
             If Form1.MouseButtons = MouseButtons.Left Then
                 x = Form1.MousePosition.X + grabOffset.X
                 y = Form1.MousePosition.Y + grabOffset.Y
+                If x < 0 Then x = 0 ' Restricts draggable objects to form bounds
+                If y < 0 Then y = 0
+                If x + sprite.Width > Form1.Width Then x = Form1.Width - sprite.Width
+                If y + sprite.Height > Form1.Height Then y = Form1.Height - sprite.Height
             Else
                 grabbed = False
                 Form1.grabLock = False
@@ -323,11 +411,13 @@ Public Class animatedValue ' An object that can interpolate between two values f
         value = 0
         duration = 10
         frame = 0
+        done = True
     End Sub
 
     Public Sub New(startValue As Single)
         Me.New()
         value = startValue
+        done = True
     End Sub
 
     Public Function updateValue() As Single
@@ -336,8 +426,9 @@ Public Class animatedValue ' An object that can interpolate between two values f
             Return value
         End If
         frame += 1
-        value = originalValue + (difference * (frame / duration)) ' (frame / duration) provides a t from 0 to 1 (the whole progression of the animation),
-        ' which is then scaled by the difference needed to cover
+        'value = originalValue + (difference * (frame / duration)) ' OLD LINEAR FUNCTION
+        value = originalValue + (difference * (1 - (frame / duration - 1) ^ 2)) ' (frame / duration) provides a t from 0 to 1 (the whole progression of the animation),
+        ' which is then scaled by the difference needed to cover; the function itself if an upside down parabola from 0 to 1 (which "eases out" of the animation).
         Return value
     End Function
 
@@ -473,7 +564,7 @@ Public Class potion
                 Next
                 Form1.money.addValue(ingredientCount * 20 + bonusValue)
             End If
-            selectedOrder.endOrder()
+            selectedOrder.kill()
             Form1.deadObjects.AddLast(Me)
         End If
     End Sub
@@ -551,7 +642,7 @@ Public Class cauldron
 
     Private Sub addIngredient(ingredient As Integer)
         If brewStage = -1 AndAlso recipe(0, 0) + recipe(0, 1) + recipe(0, 2) + recipe(0, 3) = 0 Then
-            ' Starts the brewing timer if this is the first ingredeitn added
+            ' Starts the brewing timer if this is the first ingredient added
             ' Adding up the values of the first four items to effectively check if they all equal 0 (otherwise the sum is not 0).
             brewStart = DateTime.Now
             brewStage = 0
@@ -703,51 +794,69 @@ Public Class cauldron
 
 End Class
 
+Public Class editCauldron
+    Inherits draggable
+
+    Public Sub New(base As cauldron)
+        MyBase.New(base.x, base.y)
+        sprite = base.sprite
+
+    End Sub
+
+    Public Overrides Sub tick()
+        MyBase.tick()
+    End Sub
+
+    Public Overrides Sub render(g As Graphics)
+        MyBase.render(g)
+        g.DrawImage(My.Resources.MoveIcon, New Rectangle(x - 25 + sprite.Width / 2, y - 25 + sprite.Height / 2, 50, 50))
+    End Sub
+
+End Class
+
 Public Class order
     Inherits draggable
 
     Public potionHover As Boolean
     Dim timerStart As DateTime
     Dim duration As Integer = 100000
-    Dim orderOpen, done As Boolean ' Kept independently of potion-hovering effects (which can temporarily open an order)
+    Dim orderOpen As Boolean ' Kept independently of potion-hovering effects (which can temporarily open an order)
     Dim maxHeight As Integer
     Dim orderHeight As animatedValue = New animatedValue()
-    Dim dy As animatedValue = New animatedValue(-100)
+    Dim spawnDX As animatedValue = New animatedValue(100)
     Dim spawning As Boolean
     Public recipe(0 To 2, 0 To 3) As Integer
 
     Public Sub New()
-        MyBase.New(1600, -100)
+        MyBase.New(0, 30)
         sprite = My.Resources.PaperRoll
         orderHeight.snapValue(40)
         orderHeight.duration = 2
         orderOpen = False
         potionHover = False
-        done = False
         spawning = True
         Randomize()
         recipe = {{Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)},
             {Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)},
             {Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)}}
         timerStart = DateTime.Now
-        dy.setValue(50)
+        spawnDX.setValue(-280)
     End Sub
 
     Public Sub New(offset As Integer)
-        MyBase.New(1600, -100)
+        MyBase.New(0, 30)
         sprite = My.Resources.PaperRoll
         orderHeight.snapValue(40)
         orderHeight.duration = 2
         orderOpen = False
         potionHover = False
-        done = False
         spawning = True
         Randomize()
         recipe = {{Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)},
             {Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)},
             {Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)}}
         timerStart = DateTime.Now
-        dy.setValue(50 + (offset * 90)) ' TODO: Slide in from right to left (just makes more sense really)
+        spawnDX.setValue(-280 - offset * 300)
     End Sub
 
     Public Sub New(x As Integer, y As Integer)
@@ -757,7 +866,6 @@ Public Class order
         orderHeight.duration = 2
         orderOpen = False
         potionHover = False
-        done = False
         spawning = False
         Randomize()
         recipe = {{Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)},
@@ -766,8 +874,8 @@ Public Class order
         timerStart = DateTime.Now
     End Sub
 
-    Public Sub endOrder()
-        done = True
+    Public Overrides Sub kill()
+        MyBase.kill()
         orderHeight.duration = 5
         orderHeight.setValue(0)
     End Sub
@@ -781,14 +889,14 @@ Public Class order
     End Function
 
     Public Overrides Sub tick()
+        MyBase.tick()
+        If dead Then Return
         If spawning Then
-            dy.updateValue()
-            y = dy.getValue()
-            If dy.done Then spawning = False
+            spawnDX.updateValue()
+            x = Form1.Width + spawnDX.getValue() ' Slides in from the right edge
+            If spawnDX.done Then spawning = False
             Return
         End If
-        If done Then Return
-        MyBase.tick()
         If Not grabbed AndAlso Not Form1.mouseLock AndAlso
             New Rectangle(x, y + orderHeight.getValue(), sprite.Width, sprite.Height).Contains(Form1.MousePosition) And
             Form1.MouseButtons = MouseButtons.Left Then
@@ -845,7 +953,7 @@ Public Class order
 
         Form1.cleanArc(g, timerBrush, x + sprite.Width / 2, y + 8 + sprite.Height / 2, 33, 21, 180, Math.Min(getTimer() / duration * 180, 180))
 
-        If getTimer() - 3000 > duration Then endOrder()
+        If getTimer() - 3000 > duration Then kill()
 
         timerBrush.Dispose()
 
@@ -854,7 +962,6 @@ Public Class order
         textBrush.Dispose()
         textPen.Dispose()
 
-        If done AndAlso orderHeight.getValue() < 1 Then Form1.deadObjects.AddLast(Me)
     End Sub
 
 End Class

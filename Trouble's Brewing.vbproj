@@ -192,5 +192,8 @@
   <ItemGroup>
     <None Include="Resources\Moon.png" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\MoveIcon.png" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
 </Project>
