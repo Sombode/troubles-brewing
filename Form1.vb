@@ -18,7 +18,7 @@ Public Class Form1
     Public newObjects, deadObjects As LinkedList(Of gameObject) ' Lists that will be used to modify gameObjects after iteration (as the direct list cannot be modified during iteration)
     Public mouseLock, grabLock, night As Boolean
     Public day As Integer
-    Public money As animatedValue = New animatedValue(500)
+    Public money As animatedValue = New animatedValue(5000)
     Public dayTransition As animatedValue = New animatedValue(0)
     Dim shopX As animatedValue = New animatedValue(0)
     Dim shopOpen As Boolean
@@ -191,10 +191,15 @@ Public Class Form1
             ' Shop UI
 
             Dim darkBrush As SolidBrush = New SolidBrush(Color.FromArgb(200, 10, 10, 10))
-            Dim dimBrush As SolidBrush = New SolidBrush(Color.FromArgb(200, 180, 180, 180))
+            Dim dimBrush As SolidBrush = New SolidBrush(Color.FromArgb(200, 100, 100, 100))
             Dim lightBrush As SolidBrush = New SolidBrush(Color.FromArgb(255, 200, 200, 200))
 
             Dim shopToggle As GraphicsPath = New GraphicsPath()
+            Dim shopFont As Font = New Font(pfc.Families(0), 40)
+            Dim shopFormat As StringFormat = New StringFormat()
+            Dim selectedItem As Integer = -1
+
+            shopFormat.Alignment = StringAlignment.Center
 
             shopX.updateValue()
 
@@ -217,20 +222,67 @@ Public Class Form1
             e.Graphics.FillRectangle(lightBrush, New Rectangle(Width - 55 + shopX.getValue(), Height / 2 - 5, 40, 10))
 
             If shopOpen Or Not shopX.done Then
-                Dim rockButton As Rectangle = New Rectangle(Width + 5 + shopX.getValue(), 17.5, 275, 250)
-                Dim ironButton As Rectangle = New Rectangle(Width + 5 + shopX.getValue(), 282.5, 275, 250)
-                Dim copperButton As Rectangle = New Rectangle(Width + 5 + shopX.getValue(), 547.5, 275, 250)
-                Dim goldButton As Rectangle = New Rectangle(Width + 5 + shopX.getValue(), 812.5, 275, 250)
                 For i = 0 To 3
                     Dim button As Rectangle = New Rectangle(Width + 5 + shopX.getValue(), 17.5 + 265 * i, 275, 250)
                     If button.Contains(MousePosition) Then
                         e.Graphics.FillRectangle(dimBrush, button)
+                        selectedItem = i
                     Else
                         e.Graphics.FillRectangle(darkBrush, button)
                     End If
+                    e.Graphics.DrawImage({My.Resources.RockCauldron, My.Resources.Cauldron, My.Resources.CopperCauldron, My.Resources.GoldCauldron}(i),
+                                         New Rectangle(Width + 17.5 + shopX.getValue(), 20 + 265 * i, 250, 200))
+                    e.Graphics.DrawString("$1000", shopFont, lightBrush, New Point(Width + 145 + shopX.getValue(), 210 + 265 * i), shopFormat)
                 Next
             Else
                 e.Graphics.FillRectangle(lightBrush, New Rectangle(Width - 40 + shopX.getValue(), Height / 2 - 20, 10, 40))
+            End If
+
+            If Not selectedItem = -1 Then
+                Dim descriptionFont As Font = New Font(pfc.Families(0), 24)
+                shopFormat.Alignment = StringAlignment.Near
+                e.Graphics.FillRectangle(darkBrush, New Rectangle(Width - 510 + shopX.getValue(), 17.5, 500, 300))
+                If selectedItem = 0 Then ' TODO: Tweak prices
+                    e.Graphics.DrawString("Stone Cauldron", shopFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 17.5), shopFormat)
+                    e.Graphics.DrawString("This is a very cool cauldron.", descriptionFont, lightBrush, New Point(Width - 500 + shopX.getValue(), 100), shopFormat)
+                    If money.getValue() < 1000 Then e.Graphics.DrawString("You cannot afford this!", descriptionFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 280), shopFormat)
+                    If Not mouseLock AndAlso MouseButtons = MouseButtons.Left AndAlso money.getValue() >= 1000 Then
+                        shopX.setValue(0)
+                        shopOpen = False
+                        money.addValue(-1000)
+                        newObjects.AddLast(New editCauldron(MousePosition, My.Resources.RockCauldron, New Point(-125, -100)))
+                    End If
+                ElseIf selectedItem = 1 Then
+                    e.Graphics.DrawString("Iron Cauldron", shopFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 17.5), shopFormat)
+                    e.Graphics.DrawString("This is a very cool cauldron.", descriptionFont, lightBrush, New Point(Width - 500 + shopX.getValue(), 100), shopFormat)
+                    If money.getValue() < 1000 Then e.Graphics.DrawString("You cannot afford this!", descriptionFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 280), shopFormat)
+                    If Not mouseLock AndAlso MouseButtons = MouseButtons.Left AndAlso money.getValue() >= 1000 Then
+                        shopX.setValue(0)
+                        shopOpen = False
+                        money.addValue(-1000)
+                        newObjects.AddLast(New editCauldron(MousePosition, My.Resources.Cauldron, New Point(-125, -100)))
+                    End If
+                ElseIf selectedItem = 2 Then
+                    e.Graphics.DrawString("Copper Cauldron", shopFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 17.5), shopFormat)
+                    e.Graphics.DrawString("This is a very cool cauldron.", descriptionFont, lightBrush, New Point(Width - 500 + shopX.getValue(), 100), shopFormat)
+                    If money.getValue() < 1000 Then e.Graphics.DrawString("You cannot afford this!", descriptionFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 280), shopFormat)
+                    If Not mouseLock AndAlso MouseButtons = MouseButtons.Left AndAlso money.getValue() >= 1000 Then
+                        shopX.setValue(0)
+                        shopOpen = False
+                        money.addValue(-1000)
+                        newObjects.AddLast(New editCauldron(MousePosition, My.Resources.CopperCauldron, New Point(-125, -100)))
+                    End If
+                Else
+                    e.Graphics.DrawString("Gold Cauldron", shopFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 17.5), shopFormat)
+                    e.Graphics.DrawString("This is a very cool cauldron.", descriptionFont, lightBrush, New Point(Width - 500 + shopX.getValue(), 100), shopFormat)
+                    If money.getValue() < 1000 Then e.Graphics.DrawString("You cannot afford this!", descriptionFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 280), shopFormat)
+                    If Not mouseLock AndAlso MouseButtons = MouseButtons.Left AndAlso money.getValue() >= 1000 Then
+                        shopX.setValue(0)
+                        shopOpen = False
+                        money.addValue(-1000)
+                        newObjects.AddLast(New editCauldron(MousePosition, My.Resources.GoldCauldron, New Point(-125, -100)))
+                    End If
+                End If
             End If
 
             darkBrush.Dispose()
@@ -417,6 +469,8 @@ Public Class animatedValue ' An object that can interpolate between two values f
     Public Sub New(startValue As Single)
         Me.New()
         value = startValue
+        duration = 10
+        frame = 10
         done = True
     End Sub
 
@@ -800,7 +854,14 @@ Public Class editCauldron
     Public Sub New(base As cauldron)
         MyBase.New(base.x, base.y)
         sprite = base.sprite
+    End Sub
 
+    Public Sub New(position As Point, type As Image, offset As Point)
+        MyBase.New(position.X, position.Y)
+        sprite = type
+        grabbed = True
+        Form1.grabLock = True
+        grabOffset = offset
     End Sub
 
     Public Overrides Sub tick()

@@ -123,6 +123,16 @@ Namespace My.Resources
         '''<summary>
         '''  Looks up a localized resource of type System.Drawing.Bitmap.
         '''</summary>
+        Friend ReadOnly Property CopperCauldron() As System.Drawing.Bitmap
+            Get
+                Dim obj As Object = ResourceManager.GetObject("CopperCauldron", resourceCulture)
+                Return CType(obj,System.Drawing.Bitmap)
+            End Get
+        End Property
+        
+        '''<summary>
+        '''  Looks up a localized resource of type System.Drawing.Bitmap.
+        '''</summary>
         Friend ReadOnly Property Crystal() As System.Drawing.Bitmap
             Get
                 Dim obj As Object = ResourceManager.GetObject("Crystal", resourceCulture)
@@ -146,6 +156,16 @@ Namespace My.Resources
         Friend ReadOnly Property Eye() As System.Drawing.Bitmap
             Get
                 Dim obj As Object = ResourceManager.GetObject("Eye", resourceCulture)
+                Return CType(obj,System.Drawing.Bitmap)
+            End Get
+        End Property
+        
+        '''<summary>
+        '''  Looks up a localized resource of type System.Drawing.Bitmap.
+        '''</summary>
+        Friend ReadOnly Property GoldCauldron() As System.Drawing.Bitmap
+            Get
+                Dim obj As Object = ResourceManager.GetObject("GoldCauldron", resourceCulture)
                 Return CType(obj,System.Drawing.Bitmap)
             End Get
         End Property
@@ -236,6 +256,16 @@ Namespace My.Resources
         Friend ReadOnly Property PotionStopper() As System.Drawing.Bitmap
             Get
                 Dim obj As Object = ResourceManager.GetObject("PotionStopper", resourceCulture)
+                Return CType(obj,System.Drawing.Bitmap)
+            End Get
+        End Property
+        
+        '''<summary>
+        '''  Looks up a localized resource of type System.Drawing.Bitmap.
+        '''</summary>
+        Friend ReadOnly Property RockCauldron() As System.Drawing.Bitmap
+            Get
+                Dim obj As Object = ResourceManager.GetObject("RockCauldron", resourceCulture)
                 Return CType(obj,System.Drawing.Bitmap)
             End Get
         End Property
