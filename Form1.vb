@@ -132,7 +132,7 @@ Public Class Form1
         Dim coin As Image = My.Resources.Coin
         Dim outline As Pen = New Pen(Color.Black, 10)
 
-        outline.LineJoin = LineJoin.Round
+        outline.LineJoin = LineJoin.Bevel
 
         money.updateValue()
 
@@ -903,20 +903,37 @@ Public Class editCauldron
                 x = safePosition.X
                 y = safePosition.Y
             End If
-            If isOverlapping() Then ' An edge case that will most likely occur when a new cauldron is bought but spawn on top of an existing one. Tries to find empty space to the left
+            If isOverlapping() Then ' An edge case that will most likely occur when a new cauldron is bought but spawn on top of an existing one. Tries to find empty space around
                 Dim overlapping As Boolean = True
-                While overlapping
+                Dim lastPosition As Point = New Point(x, y)
+                While isOverlapping() ' Tries each direction sequentially to find space (left, right, up, down)
                     x -= 20
-                    Console.WriteLine(x)
-                    overlapping = isOverlapping()
-                    If x < 30 Then ' Worst case scenario where no empty space exists to the left (only if the player creates a line of cauldrons to block the new one), defaults to middle
-                        x = Form1.Width / 2 - sprite.Width / 2
-                        y = Form1.Height / 2 - sprite.Height / 2
-                        safePosition = New Point(x, y)
-                        Exit While
+                    If x < 0 Then
+                        x = lastPosition.X
+                        While isOverlapping()
+                            x += 20
+                            If x + sprite.Width > Form1.Width Then
+                                x = lastPosition.X
+                                While isOverlapping()
+                                    y -= 20
+                                    If y < 0 Then
+                                        y = lastPosition.Y
+                                        While isOverlapping()
+                                            y += 20
+                                            If y + sprite.Height > Form1.Height Then ' Worst case scenario where no empty space exists to the left (only if the player creates a line of cauldrons to block the new one), defaults to middle
+                                                x = Form1.Width / 2 - sprite.Width / 2
+                                                y = Form1.Height / 2 - sprite.Height / 2
+                                                safePosition = New Point(x, y)
+                                                Exit While
+                                            End If
+                                        End While
+                                    End If
+                                End While
+                            End If
+                        End While
                     End If
                 End While
-            End If
+            End If ' This amount of tabs is horribly grotesque but I am too lazy to find a way to condense it so here we are
         Else
             safePosition = New Point(x, y)
         End If
@@ -932,13 +949,35 @@ Public Class editCauldron
     Public Overrides Sub render(g As Graphics)
         MyBase.render(g)
         Dim iconBackground As SolidBrush = New SolidBrush(Color.FromArgb(200, 10, 10, 10))
-        Dim iconRect As Rectangle = New Rectangle(x - 30 + sprite.Width / 2, y - 30 + sprite.Height / 2, 60, 60)
+        Dim selectedBackground As SolidBrush = New SolidBrush(Color.FromArgb(200, 200, 200, 200))
+        Dim iconRect As Rectangle = New Rectangle(x - 30 + sprite.Width / 2, y - 50 + sprite.Height / 2, 60, 60)
+        Dim sellRect As Rectangle = New Rectangle(x - 30 + sprite.Width / 2, y + 20 + sprite.Height / 2, 60, 60)
         g.FillEllipse(iconBackground, iconRect)
+        If Not Form1.grabLock AndAlso getBounds().Contains(Form1.MousePosition) AndAlso Not sellRect.Contains(Form1.MousePosition) Then g.FillEllipse(selectedBackground, iconRect)
         If grabbed AndAlso isOverlapping() Then
             g.DrawImage(My.Resources.CancelIcon, iconRect)
         Else
             g.DrawImage(My.Resources.MoveIcon, iconRect)
+            If Not grabbed Then
+                g.FillEllipse(iconBackground, sellRect)
+                If sellRect.Contains(Form1.MousePosition) Then
+                    Dim sellPen As Pen = New Pen(Color.Black, 8)
+                    sellPen.LineJoin = LineJoin.Bevel
+                    grabPrimed = False ' As tick is before render, grabPrimed is set to false here so that clicking the sell button takes priority over being grabbed
+                    g.FillEllipse(selectedBackground, sellRect)
+                    Form1.outlineText(g, "$800", Form1.pfc.Families(0), 40, Brushes.White, sellPen, New Point(x + 30 + sprite.Width / 2, y + 50 + sprite.Height / 2), StringAlignment.Near)
+                    If Form1.MouseButtons = MouseButtons.Left Then
+                        Form1.money.addValue(800)
+                        Form1.grabLock = False
+                        Form1.deadObjects.AddLast(Me)
+                    End If
+                End If
+                g.DrawImage(My.Resources.SellIcon, sellRect)
+            End If
+
         End If
+        iconBackground.Dispose()
+        selectedBackground.Dispose()
     End Sub
 
 End Class
