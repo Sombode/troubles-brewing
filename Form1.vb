@@ -29,7 +29,7 @@ Public Class Form1
     ' TODO: (Polish) rolling list of transactions (class); moves up and fades out
 
     Public pfc As PrivateFontCollection = New PrivateFontCollection() ' PFC and custom font code derived from: https://stackoverflow.com/questions/13573916/using-custom-fonts-in-my-winform-labels
-    Public debugFont As Font
+    Public debugFont As Font ' TODO: Remove
 
     Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         Randomize()
@@ -172,7 +172,7 @@ Public Class Form1
                 ' TODO: Night mode
                 shopOpen = False
                 For Each obj In gameObjects
-                    If obj.GetType() = GetType(cauldron) Then
+                    If obj.GetType() = GetType(cauldron) Then ' TODO: Source?
                         ' Replaces cauldrons with a movable version of themselves during the night
                         newObjects.AddLast(New editCauldron(obj))
                         deadObjects.AddLast(obj)
@@ -250,6 +250,7 @@ Public Class Form1
                         shopX.setValue(0)
                         shopOpen = False
                         money.addValue(-1000)
+                        resetDrag()
                         newObjects.AddLast(New editCauldron(MousePosition, My.Resources.RockCauldron, New Point(-125, -100)))
                     End If
                 ElseIf selectedItem = 1 Then
@@ -260,6 +261,7 @@ Public Class Form1
                         shopX.setValue(0)
                         shopOpen = False
                         money.addValue(-1000)
+                        resetDrag()
                         newObjects.AddLast(New editCauldron(MousePosition, My.Resources.Cauldron, New Point(-125, -100)))
                     End If
                 ElseIf selectedItem = 2 Then
@@ -270,6 +272,7 @@ Public Class Form1
                         shopX.setValue(0)
                         shopOpen = False
                         money.addValue(-1000)
+                        resetDrag()
                         newObjects.AddLast(New editCauldron(MousePosition, My.Resources.CopperCauldron, New Point(-125, -100)))
                     End If
                 Else
@@ -280,6 +283,7 @@ Public Class Form1
                         shopX.setValue(0)
                         shopOpen = False
                         money.addValue(-1000)
+                        resetDrag()
                         newObjects.AddLast(New editCauldron(MousePosition, My.Resources.GoldCauldron, New Point(-125, -100)))
                     End If
                 End If
@@ -320,6 +324,27 @@ Public Class Form1
     Public Sub moveToFront(gameObj As gameObject) ' Moves an object to the front of its layer (based on type) by removing it from the list but readding it to the front
         newObjects.AddLast(gameObj) ' Adding to the back of the list so that all objects added are moved to the front in the right order (objects moved last are in front)
         deadObjects.AddLast(gameObj)
+    End Sub
+
+    Public Sub resetDrag() ' Iterates through all draggable types and releases them
+        For Each obj In gameObjects.OfType(Of potion)
+            If obj.grabbed Then
+                obj.grabbed = False
+                obj.onRelease()
+            End If
+        Next
+        For Each obj In gameObjects.OfType(Of order)
+            If obj.grabbed Then
+                obj.grabbed = False
+                obj.onRelease()
+            End If
+        Next
+        For Each obj In gameObjects.OfType(Of editCauldron)
+            If obj.grabbed Then
+                obj.grabbed = False
+                obj.onRelease()
+            End If
+        Next
     End Sub
 
     ' Useful paint functions
@@ -771,6 +796,7 @@ Public Class cauldron
                     If mouseAngle < 0 And mouseAngle > -Math.PI Then
                         Form1.cleanArc(g, lightBrush, centerX, centerY + 5, 225, 75, 0, 180)
                         If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then
+                            Form1.resetDrag()
                             Form1.newObjects.AddFirst(New potion(Form1.MousePosition.X - 50, Form1.MousePosition.Y - 50, New Point(-50, -50), recipe,
                                                                  CInt(20 - Math.Abs(90 - CDec(Math.Abs(180 - ((getBrewTime() / 5) Mod 360)))) / 9 * 2)))
                             ' Bonus money is calculated by getting the absolute difference between the current arrow's angle and 90 (the center), then putting it between 0 and 20
@@ -851,9 +877,12 @@ End Class
 Public Class editCauldron
     Inherits draggable
 
+    Dim safePosition As Point = New Point(-404, 0)
+
     Public Sub New(base As cauldron)
         MyBase.New(base.x, base.y)
         sprite = base.sprite
+        safePosition = New Point(x, y)
     End Sub
 
     Public Sub New(position As Point, type As Image, offset As Point)
@@ -868,9 +897,48 @@ Public Class editCauldron
         MyBase.tick()
     End Sub
 
+    Public Overrides Sub onRelease()
+        If isOverlapping() Then
+            If Not safePosition.X = -404 Then ' Completely arbitrary number to see if a safe position exists
+                x = safePosition.X
+                y = safePosition.Y
+            End If
+            If isOverlapping() Then ' An edge case that will most likely occur when a new cauldron is bought but spawn on top of an existing one. Tries to find empty space to the left
+                Dim overlapping As Boolean = True
+                While overlapping
+                    x -= 20
+                    Console.WriteLine(x)
+                    overlapping = isOverlapping()
+                    If x < 30 Then ' Worst case scenario where no empty space exists to the left (only if the player creates a line of cauldrons to block the new one), defaults to middle
+                        x = Form1.Width / 2 - sprite.Width / 2
+                        y = Form1.Height / 2 - sprite.Height / 2
+                        safePosition = New Point(x, y)
+                        Exit While
+                    End If
+                End While
+            End If
+        Else
+            safePosition = New Point(x, y)
+        End If
+    End Sub
+
+    Private Function isOverlapping() As Boolean
+        For Each cauldron In Form1.gameObjects.OfType(Of editCauldron)
+            If Not cauldron.Equals(Me) AndAlso getBounds.IntersectsWith(cauldron.getBounds()) Then Return True
+        Next
+        Return False
+    End Function
+
     Public Overrides Sub render(g As Graphics)
         MyBase.render(g)
-        g.DrawImage(My.Resources.MoveIcon, New Rectangle(x - 25 + sprite.Width / 2, y - 25 + sprite.Height / 2, 50, 50))
+        Dim iconBackground As SolidBrush = New SolidBrush(Color.FromArgb(200, 10, 10, 10))
+        Dim iconRect As Rectangle = New Rectangle(x - 30 + sprite.Width / 2, y - 30 + sprite.Height / 2, 60, 60)
+        g.FillEllipse(iconBackground, iconRect)
+        If grabbed AndAlso isOverlapping() Then
+            g.DrawImage(My.Resources.CancelIcon, iconRect)
+        Else
+            g.DrawImage(My.Resources.MoveIcon, iconRect)
+        End If
     End Sub
 
 End Class
