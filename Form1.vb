@@ -139,60 +139,39 @@ Public Class Form1
         e.Graphics.DrawImage(coin, New Rectangle(5, Height - coin.Height - 5, coin.Width, coin.Height))
         outlineText(e.Graphics, FormatCurrency(money.getValue(), 0), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(90, Height - 50), StringAlignment.Near)
 
-        ' Day display
-
         dayTransition.updateValue()
 
-        Dim dayDial As Image = My.Resources.DayDial
-        Dim circleClip As GraphicsPath = New GraphicsPath()
-
-        circleClip.AddEllipse(New Rectangle(27, 27, 66, 65))
-
-        e.Graphics.DrawImage(dayDial, New Rectangle(10, 10, dayDial.Width, dayDial.Height))
-
-        e.Graphics.SetClip(circleClip)
-
-        If night Then
-            Dim moon As Image = My.Resources.Moon
-            Dim nightBrush As SolidBrush = New SolidBrush(Color.FromArgb(CInt(dayTransition.getValue() / 20 * 255), 90, 69, 105))
-            e.Graphics.FillPath(nightBrush, circleClip)
-            e.Graphics.DrawImage(moon, New Rectangle(43, 93 - 50 * dayTransition.getValue() / 20, 33, 33))
-
-        Else
-            Dim sun As Rectangle = New Rectangle(43, 43 + getDayTime() / 100 * 5, 33, 33) ' Days last 3 minutes (180000 milliseconds), moving the sun down 50 pixels
-            Dim sunBrush As SolidBrush = New SolidBrush(Color.FromArgb(240, 201, 61))
-            Dim sunPen As Pen = New Pen(Color.FromArgb(223, 177, 58), 5)
-            e.Graphics.FillEllipse(sunBrush, sun)
-            e.Graphics.DrawEllipse(sunPen, sun)
-            sunBrush.Dispose()
-            sunPen.Dispose()
-            If getDayTime() > 1000 Then
-                night = True
-                dayTransition.setValue(20)
-                ' TODO: Night mode
-                shopOpen = False
-                For Each obj In gameObjects
-                    If obj.GetType() = GetType(cauldron) Then ' TODO: Source?
-                        ' Replaces cauldrons with a movable version of themselves during the night
-                        newObjects.AddLast(New editCauldron(obj))
-                        deadObjects.AddLast(obj)
-                        Return
-                    End If
-                    obj.kill()
-                Next
-            End If
-        End If
-
-        e.Graphics.ResetClip()
-
-        If night Then
-            outlineText(e.Graphics, ("Night" + Str(day)), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(110, 60), StringAlignment.Near)
-
-            ' Shop UI
+        If night Or Not dayTransition.done Then
 
             Dim darkBrush As SolidBrush = New SolidBrush(Color.FromArgb(200, 10, 10, 10))
             Dim dimBrush As SolidBrush = New SolidBrush(Color.FromArgb(200, 100, 100, 100))
             Dim lightBrush As SolidBrush = New SolidBrush(Color.FromArgb(255, 200, 200, 200))
+
+            ' Next day button
+
+            Dim nextButton As GraphicsPath = New GraphicsPath()
+
+            nextButton.AddEllipse(New Rectangle(27, 27 + 4.5 * dayTransition.getValue(), 66, 65))
+
+            If nextButton.IsVisible(MousePosition) Then ' Essentially .contains(Point) for graphics paths https://stackoverflow.com/questions/4816297/how-to-know-if-a-graphicspath-contains-a-point-in-c-sharp
+                e.Graphics.FillPath(dimBrush, nextButton)
+                If Not mouseLock AndAlso MouseButtons = MouseButtons.Left Then
+                    ' Return to day
+                    For Each cauldron In gameObjects.OfType(Of editCauldron)
+                        cauldron.transmute()
+                    Next
+                    dayTransition.setValue(0)
+                    night = False
+                    day += 1
+                    dayStart = DateTime.Now
+                End If
+            Else
+                e.Graphics.FillPath(darkBrush, nextButton)
+            End If
+
+            e.Graphics.DrawImage(My.Resources.NextIcon, New Rectangle(27, 27 + 4.5 * dayTransition.getValue(), 66, 65))
+
+            ' Shop UI
 
             Dim shopToggle As GraphicsPath = New GraphicsPath()
             Dim shopFont As Font = New Font(pfc.Families(0), 40)
@@ -203,9 +182,9 @@ Public Class Form1
 
             shopX.updateValue()
 
-            shopToggle.AddPie(New Rectangle(Width - 60 + shopX.getValue(), Height / 2 - 50, 100, 100), 90, 180)
+            shopToggle.AddPie(New Rectangle(Width + shopX.getValue() + (dayTransition.getValue() * -3), Height / 2 - 50, 100, 100), 90, 180)
 
-            If shopToggle.IsVisible(MousePosition) Then ' Essentially .contains(Point) for graphics paths https://stackoverflow.com/questions/4816297/how-to-know-if-a-graphicspath-contains-a-point-in-c-sharp
+            If shopToggle.IsVisible(MousePosition) Then
                 e.Graphics.FillPath(dimBrush, shopToggle)
                 If Not mouseLock AndAlso MouseButtons = MouseButtons.Left Then
                     If shopOpen Then
@@ -219,7 +198,7 @@ Public Class Form1
                 e.Graphics.FillPath(darkBrush, shopToggle)
             End If
 
-            e.Graphics.FillRectangle(lightBrush, New Rectangle(Width - 55 + shopX.getValue(), Height / 2 - 5, 40, 10))
+            e.Graphics.FillRectangle(lightBrush, New Rectangle(Width + 5 + shopX.getValue() + (dayTransition.getValue() * -3), Height / 2 - 5, 40, 10))
 
             If shopOpen Or Not shopX.done Then
                 For i = 0 To 3
@@ -235,7 +214,7 @@ Public Class Form1
                     e.Graphics.DrawString("$1000", shopFont, lightBrush, New Point(Width + 145 + shopX.getValue(), 210 + 265 * i), shopFormat)
                 Next
             Else
-                e.Graphics.FillRectangle(lightBrush, New Rectangle(Width - 40 + shopX.getValue(), Height / 2 - 20, 10, 40))
+                e.Graphics.FillRectangle(lightBrush, New Rectangle(Width + 20 + shopX.getValue() + (dayTransition.getValue() * -3), Height / 2 - 20, 10, 40))
             End If
 
             If Not selectedItem = -1 Then
@@ -251,7 +230,7 @@ Public Class Form1
                         shopOpen = False
                         money.addValue(-1000)
                         resetDrag()
-                        newObjects.AddLast(New editCauldron(MousePosition, My.Resources.RockCauldron, New Point(-125, -100)))
+                        newObjects.AddLast(New editCauldron(MousePosition, My.Resources.RockCauldron, New Point(-125, -100), 0))
                     End If
                 ElseIf selectedItem = 1 Then
                     e.Graphics.DrawString("Iron Cauldron", shopFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 17.5), shopFormat)
@@ -262,7 +241,7 @@ Public Class Form1
                         shopOpen = False
                         money.addValue(-1000)
                         resetDrag()
-                        newObjects.AddLast(New editCauldron(MousePosition, My.Resources.Cauldron, New Point(-125, -100)))
+                        newObjects.AddLast(New editCauldron(MousePosition, My.Resources.Cauldron, New Point(-125, -100), 1))
                     End If
                 ElseIf selectedItem = 2 Then
                     e.Graphics.DrawString("Copper Cauldron", shopFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 17.5), shopFormat)
@@ -273,7 +252,7 @@ Public Class Form1
                         shopOpen = False
                         money.addValue(-1000)
                         resetDrag()
-                        newObjects.AddLast(New editCauldron(MousePosition, My.Resources.CopperCauldron, New Point(-125, -100)))
+                        newObjects.AddLast(New editCauldron(MousePosition, My.Resources.CopperCauldron, New Point(-125, -100), 2))
                     End If
                 Else
                     e.Graphics.DrawString("Gold Cauldron", shopFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 17.5), shopFormat)
@@ -284,7 +263,7 @@ Public Class Form1
                         shopOpen = False
                         money.addValue(-1000)
                         resetDrag()
-                        newObjects.AddLast(New editCauldron(MousePosition, My.Resources.GoldCauldron, New Point(-125, -100)))
+                        newObjects.AddLast(New editCauldron(MousePosition, My.Resources.GoldCauldron, New Point(-125, -100), 3))
                     End If
                 End If
             End If
@@ -292,11 +271,56 @@ Public Class Form1
             darkBrush.Dispose()
             dimBrush.Dispose()
             lightBrush.Dispose()
-        Else
-            outlineText(e.Graphics, ("Day" + Str(day)), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(110, 60), StringAlignment.Near)
         End If
 
+        outlineText(e.Graphics, (If(night, "Night", "Day") + Str(day)), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(110, 60), StringAlignment.Near)
+        ' https://learn.microsoft.com/en-us/dotnet/visual-basic/language-reference/operators/if-operator Ternary operator to easily switch between day and night text
         outline.Dispose()
+
+        ' Day dial display
+
+        Dim dayDial As Image = My.Resources.DayDial
+        Dim circleClip As GraphicsPath = New GraphicsPath()
+
+        circleClip.AddEllipse(New Rectangle(27, 27, 66, 65))
+
+        e.Graphics.DrawImage(dayDial, New Rectangle(10, 10, dayDial.Width, dayDial.Height))
+
+        e.Graphics.SetClip(circleClip)
+
+        Dim sun As Rectangle = New Rectangle(43, 43 + getDayTime() / 18000 * 5, 33, 33) ' Days last 3 minutes (180000 milliseconds), moving the sun down 50 pixels
+        Dim sunBrush As SolidBrush = New SolidBrush(Color.FromArgb(240, 201, 61))
+        Dim sunPen As Pen = New Pen(Color.FromArgb(223, 177, 58), 5)
+        e.Graphics.FillEllipse(sunBrush, sun)
+        e.Graphics.DrawEllipse(sunPen, sun)
+        sunBrush.Dispose()
+        sunPen.Dispose()
+
+        If night Or Not dayTransition.done Then
+            Dim moon As Image = My.Resources.Moon
+            Dim nightBrush As SolidBrush = New SolidBrush(Color.FromArgb(CInt(dayTransition.getValue() / 20 * 255), 90, 69, 105))
+            e.Graphics.FillPath(nightBrush, circleClip)
+            e.Graphics.DrawImage(moon, New Rectangle(43, 93 - 50 * dayTransition.getValue() / 20, 33, 33))
+        Else
+            If getDayTime() > 180000 Then
+                night = True
+                shopOpen = False
+                shopX.snapValue(0)
+                dayTransition.setValue(20)
+                ' TODO: Night mode
+                For Each obj In gameObjects.OfType(Of cauldron)
+                    If obj.GetType() = GetType(cauldron) Then ' TODO: Source?
+                        ' Replaces cauldrons with a movable version of themselves during the night
+                        newObjects.AddLast(New editCauldron(obj))
+                        deadObjects.AddLast(obj)
+                    Else
+                        obj.kill()
+                    End If
+                Next
+            End If
+        End If
+
+        e.Graphics.ResetClip()
 
         If (MouseButtons = MouseButtons.Left) Then mouseLock = True
 
@@ -705,6 +729,7 @@ Public Class cauldron
     Dim brewStage As Integer ' -1 for no brew, 0 for green, 1 for yellow, 2 for red
     Dim ingredientHistory As LinkedList(Of Integer())
     Dim recipe(0 To 2, 0 To 3) As Integer
+    Public type As Integer ' 0 for stone, 1 for iron, 2 for copper, 3 for gold
     ' Ingredients put into the cauldron will be stored in three separate "arrays" (based on the first index of the recipe array;
     ' one for each "stage" of brewing). The amount of the four hardcoded ingredients will be stored in the second index in the following order (CW):
     ' Shroom, Herb, Eye, Crystal
@@ -715,8 +740,38 @@ Public Class cauldron
         recipe = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}} ' Here it may be easier to see how the ingredient amounts are stored,
         ' split into three separate "subarrays" for each of the three brewing stages.
         sprite = My.Resources.Cauldron
+        type = 1
         potionMenuActive = False
         brewStage = -1
+        setupStats()
+    End Sub
+
+    Public Sub New(base As editCauldron)
+        MyBase.New(base.x, base.y)
+        ingredientHistory = New LinkedList(Of Integer())
+        recipe = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}} ' Here it may be easier to see how the ingredient amounts are stored,
+        ' split into three separate "subarrays" for each of the three brewing stages.
+        sprite = base.sprite
+        Me.type = base.type
+        potionMenuActive = False
+        brewStage = -1
+        setupStats()
+    End Sub
+
+    Private Sub setupStats()
+        If type = 0 Then
+            ' Rock
+            totalTime = 60000
+        ElseIf type = 1 Then
+            ' Iron
+            totalTime = 45000
+        ElseIf type = 2 Then
+            ' Copper
+            totalTime = 30000
+        Else
+            ' Gold
+            totalTime = 15000
+        End If
     End Sub
 
     Private Sub addIngredient(ingredient As Integer)
@@ -878,19 +933,25 @@ Public Class editCauldron
     Inherits draggable
 
     Dim safePosition As Point = New Point(-404, 0)
+    Dim isNew As Boolean ' Used to check if a cauldron was just purchased this night or carried over from the day ("used")
+    Public type As Integer ' 0 for stone, 1 for iron, 2 for copper, 3 for gold
 
     Public Sub New(base As cauldron)
         MyBase.New(base.x, base.y)
+        Me.type = base.type
         sprite = base.sprite
         safePosition = New Point(x, y)
+        isNew = False
     End Sub
 
-    Public Sub New(position As Point, type As Image, offset As Point)
+    Public Sub New(position As Point, sprite As Image, offset As Point, type As Integer)
         MyBase.New(position.X, position.Y)
-        sprite = type
+        Me.sprite = sprite
+        Me.type = type
         grabbed = True
         Form1.grabLock = True
         grabOffset = offset
+        isNew = True
     End Sub
 
     Public Overrides Sub tick()
@@ -933,7 +994,7 @@ Public Class editCauldron
                         End While
                     End If
                 End While
-            End If ' This amount of tabs is horribly grotesque but I am too lazy to find a way to condense it so here we are
+            End If ' This amount of indents is horribly grotesque but I am too lazy to find a way to condense it so here we are
         Else
             safePosition = New Point(x, y)
         End If
@@ -945,6 +1006,11 @@ Public Class editCauldron
         Next
         Return False
     End Function
+
+    Public Sub transmute() ' Turns the cauldron back into a functioning one for the daytime
+        Form1.newObjects.AddLast(New cauldron(Me))
+        Form1.deadObjects.AddLast(Me)
+    End Sub
 
     Public Overrides Sub render(g As Graphics)
         MyBase.render(g)
@@ -963,11 +1029,11 @@ Public Class editCauldron
                 If sellRect.Contains(Form1.MousePosition) Then
                     Dim sellPen As Pen = New Pen(Color.Black, 8)
                     sellPen.LineJoin = LineJoin.Bevel
-                    grabPrimed = False ' As tick is before render, grabPrimed is set to false here so that clicking the sell button takes priority over being grabbed
+                    grabPrimed = False ' As tick happens before render, grabPrimed is set to false here so that clicking the sell button takes priority over being grabbed
                     g.FillEllipse(selectedBackground, sellRect)
                     Form1.outlineText(g, "$800", Form1.pfc.Families(0), 40, Brushes.White, sellPen, New Point(x + 30 + sprite.Width / 2, y + 50 + sprite.Height / 2), StringAlignment.Near)
-                    If Form1.MouseButtons = MouseButtons.Left Then
-                        Form1.money.addValue(800)
+                    If Not Form1.mouseLock AndAlso Form1.MouseButtons = MouseButtons.Left Then
+                        Form1.money.addValue(800) ' TODO: Change sell prices (both for types and isNew)
                         Form1.grabLock = False
                         Form1.deadObjects.AddLast(Me)
                     End If
@@ -1084,7 +1150,7 @@ Public Class order
         Dim ingredients() As Image = {My.Resources.Shroom, My.Resources.Herb, My.Resources.Eye, My.Resources.Crystal}
         Dim textBrush As SolidBrush = New SolidBrush(Color.White)
         Dim textPen As Pen = New Pen(Color.Black, 5)
-        textPen.LineJoin = LineJoin.Bevel ' Fixes a glitch where the 1 and 4 glyphs are shaped in such a way that the corners create sharp spikes ("thorns") by rounding corners
+        textPen.LineJoin = LineJoin.Bevel ' Fixes a glitch where the 1 and 4 glyphs are shaped in such a way that the corners created sharp spikes ("thorns") by rounding corners
         ' https://stackoverflow.com/questions/44683841/infinity-angles-on-sharp-corners-in-graphics
 
         orderHeight.updateValue()
