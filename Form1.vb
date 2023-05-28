@@ -51,6 +51,7 @@ Public Class Form1
         night = False
         dayStart = DateTime.Now
         pendingOrders(0) = Math.Round(Rnd() * 3)
+        pendingOrders(0) = 5
         pendingOrders(1) = Math.Round(Rnd() * 2)
         pendingOrders(2) = Math.Round(Rnd() * 1)
     End Sub
@@ -86,7 +87,7 @@ Public Class Form1
 
     Private Sub Form1_Paint(sender As Object, e As PaintEventArgs) Handles Me.Paint
 
-        e.Graphics.SmoothingMode = e.Graphics.SmoothingMode.AntiAlias
+        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias
         'https://learn.microsoft.com/en-us/dotnet/api/system.drawing.graphics.smoothingmode?view=windowsdesktop-8.0
         ' Makes drawn graphics MUCH cleaner
 
@@ -674,6 +675,7 @@ Public Class potion
 
     Public Overrides Sub onRelease()
         MyBase.onRelease()
+        If New Rectangle(Form1.Width - 160, Form1.Height - 190, 150, 180).Contains(Form1.MousePosition) Then Form1.deadObjects.AddLast(Me) ' Trashing
         If Not IsNothing(selectedOrder) Then
             ' Selling a potion
             If Form1.concatRecipe(recipe) = Form1.concatRecipe(selectedOrder.recipe) Then
@@ -711,6 +713,15 @@ Public Class potion
     End Function
 
     Public Overrides Sub render(g As Graphics)
+        If grabbed Then
+            ' Trash Can
+            Dim trashRect As Rectangle = New Rectangle(Form1.Width - 160, Form1.Height - 190, 150, 180)
+            If trashRect.Contains(Form1.MousePosition) Then
+                g.DrawImage(My.Resources.TrashOpen, trashRect)
+            Else
+                g.DrawImage(My.Resources.TrashClosed, trashRect)
+            End If
+        End If
         MyBase.render(g)
         ' Color transform code derived from: https://learn.microsoft.com/en-us/dotnet/desktop/winforms/advanced/how-to-translate-image-colors?view=netframeworkdesktop-4.8
         Dim imgAttr As ImageAttributes = New ImageAttributes ' The ImageAttributes class applies a "filter" to images when drawn
@@ -730,10 +741,11 @@ Public Class potion
             g.RotateTransform(45)
             g.DrawImage(My.Resources.PotionStopper, New Rectangle(-sprite.Width / 2, -sprite.Height / 2, sprite.Width, sprite.Height))
             ' Potion "rotates" on pickup (liquid and gleam are independent of rotation, so they don't move)
+            g.ResetTransform()
+
         Else
             g.DrawImage(My.Resources.PotionStopper, getBounds())
         End If
-        g.ResetTransform()
     End Sub
 
 End Class
@@ -745,8 +757,10 @@ Public Class cauldron
     Dim potionMenuActive As Boolean
     Dim totalTime As Integer = 10000
     Dim brewStage As Integer ' -1 for no brew, 0 for green, 1 for yellow, 2 for red
-    Dim ingredientHistory, fallingIngredients, fallenIngredients As LinkedList(Of Integer())
+    Dim fallingIngredients, fallenIngredients As LinkedList(Of Integer())
     Dim recipe(0 To 2, 0 To 3) As Integer
+    Dim ingredientHistory As Bitmap
+    Dim historyGraphics As Graphics
     Public type As Integer ' 0 for stone, 1 for iron, 2 for copper, 3 for gold
     ' Ingredients put into the cauldron will be stored in three separate "arrays" (based on the first index of the recipe array;
     ' one for each "stage" of brewing). The amount of the four hardcoded ingredients will be stored in the second index in the following order (CW):
@@ -754,7 +768,6 @@ Public Class cauldron
 
     Public Sub New()
         MyBase.New(0, 0)
-        ingredientHistory = New LinkedList(Of Integer())
         fallingIngredients = New LinkedList(Of Integer())
         fallenIngredients = New LinkedList(Of Integer()) ' Essentially deadObjects (from Form1) for fallingIngredients
         recipe = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}} ' Here it may be easier to see how the ingredient amounts are stored,
@@ -781,6 +794,20 @@ Public Class cauldron
         setupStats()
     End Sub
 
+    Private Sub setupHistory()
+        ' The ingredients history (the semicircle at the bottom) shows the ingredients at the time they were added
+        ' This is rendered as a bitmap of the background at first, and as ingredients are added they are added to the bitmap
+        ingredientHistory = New Bitmap(650, 350)
+        historyGraphics = Graphics.FromImage(ingredientHistory)
+        historyGraphics.SmoothingMode = SmoothingMode.AntiAlias
+        Dim historyPen As Pen = New Pen(Color.Black, 10)
+        historyGraphics.DrawPath(historyPen, Form1.cleanArc(historyGraphics, Brushes.Black, 325, 162.5, 325, 300, -5, 190))
+        historyPen.Dispose()
+        Form1.cleanArc(historyGraphics, New SolidBrush(Color.FromArgb(117, 200, 100)), 325, 162.5, 325, 300, 120, 65)
+        Form1.cleanArc(historyGraphics, New SolidBrush(Color.FromArgb(240, 201, 61)), 325, 162.5, 325, 300, 60, 60)
+        Form1.cleanArc(historyGraphics, New SolidBrush(Color.FromArgb(196, 76, 68)), 325, 162.5, 325, 300, -5, 65)
+    End Sub
+
     Private Sub setupStats()
         Select Case type
             Case 0
@@ -803,15 +830,24 @@ Public Class cauldron
             ' Starts the brewing timer if this is the first ingredient added
             ' Adding up the values of the first four items to effectively check if they all equal 0 (otherwise the sum is not 0).
             brewStart = DateTime.Now
+            setupHistory()
             brewStage = 0
         End If
         recipe(brewStage, ingredient) += 1
         Form1.money.addValue(-10)
         Dim brewingAngle As Single = Math.Min(getBrewTime() * 180 / totalTime, 180) * Math.PI / 180 ' Same calculation as for the brew dial (with a lower bound), but converted to radians
-        ingredientHistory.AddLast({ingredient, Math.Cos(brewingAngle) * -155, Math.Sin(brewingAngle) * 155})
-        ' Stores the ingredient type, and the x and y (calculated from sine and cosine) (will be offset to center by cauldron at render)
-        fallingIngredients.AddLast({ingredient, sprite.Height + 10, 2})
-        ' Stored as type, y offset, and dy (velocity)
+        Select Case ingredient ' Adding the ingredients at their positions (via sin and cos of the brewing angle) on the history to the bitmap 
+            Case 0
+                historyGraphics.DrawImage(My.Resources.Shroom, New Rectangle(325 + Math.Cos(brewingAngle) * -155 - 15, 150 + Math.Sin(brewingAngle) * 155, 30, 30))
+            Case 1
+                historyGraphics.DrawImage(My.Resources.Herb, New Rectangle(325 + Math.Cos(brewingAngle) * -155 - 15, 150 + Math.Sin(brewingAngle) * 155, 30, 30))
+            Case 2
+                historyGraphics.DrawImage(My.Resources.Eye, New Rectangle(325 + Math.Cos(brewingAngle) * -155 - 15, 150 + Math.Sin(brewingAngle) * 155, 30, 30))
+            Case 3
+                historyGraphics.DrawImage(My.Resources.Crystal, New Rectangle(325 + Math.Cos(brewingAngle) * -155 - 15, 150 + Math.Sin(brewingAngle) * 155, 30, 30))
+        End Select
+        fallingIngredients.AddLast({ingredient, sprite.Height + 10, 2}) ' TODO: Consider storing as a struct?
+        ' Stored as ingredient type, y offset, and dy (velocity)
     End Sub
 
     Private Function getBrewTime() As Integer
@@ -851,10 +887,8 @@ Public Class cauldron
                 Case 3
                     g.DrawImage(My.Resources.Crystal, New Rectangle(centerX - 30, centerY - ingredient(1), 60, 60))
             End Select
-            'g.DrawImage({My.Resources.Shroom, My.Resources.Herb, My.Resources.Eye, My.Resources.Crystal}(ingredient(0)),
-            '            New Rectangle(centerX - 30, centerY - ingredient(1), 60, 60))
-            ingredient(1) -= ingredient(2)
-            ingredient(2) += 1
+            ingredient(1) -= ingredient(2) ' Velocity (dy)
+            ingredient(2) += 1 ' Gravity/Acceleration (dy^2)
             If ingredient(1) <= 0 Then fallenIngredients.AddLast(ingredient)
         Next
 
@@ -906,7 +940,7 @@ Public Class cauldron
                             recipe = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}} ' Resetting the cauldron's state
                             potionMenuActive = False
                             brewStage = -1
-                            ingredientHistory.Clear()
+                            setupHistory()
                         End If
                     End If
                 End If
@@ -934,19 +968,6 @@ Public Class cauldron
                             Form1.cleanArc(g, lightBrush, centerX, centerY, 225, 75, -45, 90)
                             If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then addIngredient(1)
                     End Select
-                    'If mouseAngle <= (Math.PI / 4) And mouseAngle >= (-Math.PI / 4) Then ' Left Section (Crystal)
-                    '    Form1.cleanArc(g, lightBrush, centerX, centerY, 225, 75, 135, 90)
-                    '    If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then addIngredient(3)
-                    'ElseIf mouseAngle > (Math.PI / 4) And mouseAngle < (3 * Math.PI / 4) Then ' Top Section (Shroom)
-                    '    Form1.cleanArc(g, lightBrush, centerX, centerY, 225, 75, 225, 90)
-                    '    If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then addIngredient(0)
-                    'ElseIf mouseAngle >= (3 * Math.PI / 4) Or mouseAngle <= (-3 * Math.PI / 4) Then ' Right Section (Herb)
-                    '    Form1.cleanArc(g, lightBrush, centerX, centerY, 225, 75, -45, 90)
-                    '    If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then addIngredient(1)
-                    'ElseIf mouseAngle < (-Math.PI / 4) And mouseAngle > (-3 * Math.PI / 4) Then ' Bottom Section (Eye)
-                    '    Form1.cleanArc(g, lightBrush, centerX, centerY, 225, 75, 45, 90)
-                    '    If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then addIngredient(2)
-                    'End If
                 End If
                 g.DrawImage(My.Resources.Shroom, New Rectangle(centerX - 30, centerY - 105, 60, 60))
                 g.DrawImage(My.Resources.Herb, New Rectangle(centerX + 45, centerY - 30, 60, 60))
@@ -957,30 +978,7 @@ Public Class cauldron
 
                 ' Rendering the ingredient history
 
-                Dim historyPen As Pen = New Pen(Color.Black, 10)
-
-                g.DrawPath(historyPen, Form1.cleanArc(g, Brushes.Black, centerX, centerY, 325, 300, -5, 190))
-
-                historyPen.Dispose()
-
-                Form1.cleanArc(g, New SolidBrush(Color.FromArgb(117, 200, 100)), centerX, centerY, 325, 300, 120, 65)
-                Form1.cleanArc(g, New SolidBrush(Color.FromArgb(240, 201, 61)), centerX, centerY, 325, 300, 60, 60)
-                Form1.cleanArc(g, New SolidBrush(Color.FromArgb(196, 76, 68)), centerX, centerY, 325, 300, -5, 65)
-
-                For Each ingredient In ingredientHistory
-                    Select Case ingredient(0) ' https://learn.microsoft.com/en-us/dotnet/visual-basic/language-reference/statements/select-case-statement
-                        Case 0
-                            g.DrawImage(My.Resources.Shroom, New Rectangle(centerX + ingredient(1) - 15, centerY + ingredient(2) - 15, 30, 30))
-                        Case 1
-                            g.DrawImage(My.Resources.Herb, New Rectangle(centerX + ingredient(1) - 15, centerY + ingredient(2) - 15, 30, 30))
-                        Case 2
-                            g.DrawImage(My.Resources.Eye, New Rectangle(centerX + ingredient(1) - 15, centerY + ingredient(2) - 15, 30, 30))
-                        Case 3
-                            g.DrawImage(My.Resources.Crystal, New Rectangle(centerX + ingredient(1) - 15, centerY + ingredient(2) - 15, 30, 30))
-                    End Select
-                    'g.DrawImage({My.Resources.Shroom, My.Resources.Herb, My.Resources.Eye, My.Resources.Crystal}(ingredient(0)),
-                    '            New Rectangle(centerX + ingredient(1) - 15, centerY + ingredient(2) - 15, 30, 30))
-                Next
+                g.DrawImage(ingredientHistory, New Rectangle(centerX - 325, centerY - 175, 650, 350))
 
                 If potionMenuActive Then
                     g.DrawImage(My.Resources.CancelIcon, New Rectangle(centerX - 29, centerY - 29, 60, 60))
@@ -1072,7 +1070,7 @@ Public Class editCauldron
         End If
     End Sub
 
-    Private Function isOverlapping() As Boolean
+    Private Function isOverlapping() As Boolean ' Tests for overlap with other cauldrons
         For Each cauldron In Form1.gameObjects.OfType(Of editCauldron)
             If Not cauldron.Equals(Me) AndAlso getBounds.IntersectsWith(cauldron.getBounds()) Then Return True
         Next
@@ -1123,7 +1121,6 @@ End Class
 Public Class order
     Inherits draggable
 
-    Public potionHover As Boolean
     Dim timerStart As DateTime
     Dim duration As Integer = 100000
     Dim orderOpen As Boolean ' Kept independently of potion-hovering effects (which can temporarily open an order)
@@ -1131,7 +1128,9 @@ Public Class order
     Dim orderHeight As animatedValue = New animatedValue()
     Dim spawnDX As animatedValue = New animatedValue(100)
     Dim spawning As Boolean
+    Dim orderImg As Bitmap
     Public recipe(0 To 2, 0 To 3) As Integer
+    Public potionHover As Boolean
 
     Public Sub New()
         MyBase.New(0, 30)
@@ -1147,6 +1146,7 @@ Public Class order
             {Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)}}
         timerStart = DateTime.Now
         spawnDX.setValue(-280)
+        createOrderImg()
     End Sub
 
     Public Sub New(offset As Integer)
@@ -1163,6 +1163,7 @@ Public Class order
             {Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)}}
         timerStart = DateTime.Now
         spawnDX.setValue(-280 - offset * 300)
+        createOrderImg()
     End Sub
 
     Public Sub New(x As Integer, y As Integer)
@@ -1178,6 +1179,7 @@ Public Class order
             {Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)},
             {Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)}}
         timerStart = DateTime.Now
+        createOrderImg()
     End Sub
 
     Public Overrides Sub kill()
@@ -1193,6 +1195,41 @@ Public Class order
     Private Function getTimer() As Integer
         Return (DateTime.Now.TimeOfDay - timerStart.TimeOfDay).TotalMilliseconds
     End Function
+
+    Private Sub createOrderImg()
+        ' The actual order is a bitmap image that is created when the order is instantiated, with all the necessary
+        ' ingredients/parts rendered onto it here so that it can be rendered at runtime as just an image, significantly
+        ' improving performance.
+        ' https://learn.microsoft.com/en-us/dotnet/desktop/winforms/advanced/how-to-create-a-bitmap-at-run-time?view=netframeworkdesktop-4.8
+        orderImg = New Bitmap(219, 268)
+        Dim g As Graphics = Graphics.FromImage(orderImg)
+        Dim textPen As Pen = New Pen(Color.Black, 5)
+        g.SmoothingMode = SmoothingMode.AntiAlias
+        textPen.LineJoin = LineJoin.Bevel ' Fixes a glitch where the 1 and 4 glyphs are shaped in such a way that the corners created sharp spikes ("thorns") by rounding corners
+        ' https://stackoverflow.com/questions/44683841/infinity-angles-on-sharp-corners-in-graphics
+        g.DrawImage(My.Resources.OrderBackground, New Rectangle(0, 0, 219, 268))
+        For h = 0 To 2 ' Iterating through brew stages (columns)
+            Dim emptyOffset As Integer = 0
+            For k = 0 To 3 ' Iterating (rendering) through all four ingredients (in a column)
+                If recipe(h, k) = 0 Then
+                    emptyOffset += 1 ' If an ingredient shouldn't be added, shift back the y offset of all subsequent ingredients in the column by 1 (45)
+                Else
+                    Select Case k
+                        Case 0
+                            g.DrawImage(My.Resources.Shroom, New Rectangle(20 + (64 * h), 61 + (45 * (k - emptyOffset)), 40, 40))
+                        Case 1
+                            g.DrawImage(My.Resources.Herb, New Rectangle(20 + (64 * h), 61 + (45 * (k - emptyOffset)), 40, 40))
+                        Case 2
+                            g.DrawImage(My.Resources.Eye, New Rectangle(20 + (64 * h), 61 + (45 * (k - emptyOffset)), 40, 40))
+                        Case 3
+                            g.DrawImage(My.Resources.Crystal, New Rectangle(20 + (64 * h), 61 + (45 * (k - emptyOffset)), 40, 40))
+                    End Select
+                    Form1.outlineText(g, recipe(h, k), Form1.pfc.Families(0), 20, Brushes.White, textPen, New Point(62.5 + (64 * h), 91 + (45 * (k - emptyOffset))), StringAlignment.Far)
+                End If
+            Next
+        Next
+        textPen.Dispose()
+    End Sub
 
     Public Overrides Sub tick()
         MyBase.tick()
@@ -1217,11 +1254,6 @@ Public Class order
     End Sub
 
     Public Overrides Sub render(g As Graphics)
-        'If Form1.MouseButtons = MouseButtons.Right Then orderHeight += 5
-        Dim bg As Image = My.Resources.OrderBackground
-        Dim textPen As Pen = New Pen(Color.Black, 5)
-        textPen.LineJoin = LineJoin.Bevel ' Fixes a glitch where the 1 and 4 glyphs are shaped in such a way that the corners created sharp spikes ("thorns") by rounding corners
-        ' https://stackoverflow.com/questions/44683841/infinity-angles-on-sharp-corners-in-graphics
 
         orderHeight.updateValue()
 
@@ -1229,30 +1261,7 @@ Public Class order
 
         g.SetClip(getPaperRect())
 
-        If orderHeight.getValue() > 50 Then
-            g.DrawImage(bg, New Rectangle(x + 3, y + 19, bg.Width, bg.Height))
-            For h = 0 To 2 ' Iterating through brew stages (columns)
-                Dim emptyOffset As Integer = 0
-                For k = 0 To 3 ' Iterating (rendering) through all four ingredients (in a column)
-                    If recipe(h, k) = 0 Then
-                        emptyOffset += 1 ' If an ingredient shouldn't be added, shift back the y offset of all subsequent ingredients in the column by 1 (45)
-                    Else
-                        Select Case k
-                            Case 0
-                                g.DrawImage(My.Resources.Shroom, New Rectangle(x + 23 + (64 * h), y + 80 + (45 * (k - emptyOffset)), 40, 40))
-                            Case 1
-                                g.DrawImage(My.Resources.Herb, New Rectangle(x + 23 + (64 * h), y + 80 + (45 * (k - emptyOffset)), 40, 40))
-                            Case 2
-                                g.DrawImage(My.Resources.Eye, New Rectangle(x + 23 + (64 * h), y + 80 + (45 * (k - emptyOffset)), 40, 40))
-                            Case 3
-                                g.DrawImage(My.Resources.Crystal, New Rectangle(x + 23 + (64 * h), y + 80 + (45 * (k - emptyOffset)), 40, 40))
-                        End Select
-                        Form1.outlineText(g, recipe(h, k), Form1.pfc.Families(0), 20, Brushes.White, textPen, New Point(x + 65.5 + (64 * h), y + 110 + (45 * (k - emptyOffset))), StringAlignment.Far)
-                    End If
-                Next
-            Next
-        Else
-        End If
+        g.DrawImage(orderImg, New Rectangle(x + 3, y + 19, 219, 268))
 
         g.ResetClip()
 
@@ -1271,8 +1280,6 @@ Public Class order
         timerBrush.Dispose()
 
         If potionHover AndAlso orderHeight.getValue() > 274 Then g.DrawImage(My.Resources.SellOverlay, New Rectangle(x, y, sprite.Width, sprite.Height + 275))
-
-        textPen.Dispose()
 
     End Sub
 

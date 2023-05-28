@@ -210,5 +210,11 @@
   <ItemGroup>
     <None Include="Resources\NextIcon.png" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\TrashClosed.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\TrashOpen.png" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
 </Project>
