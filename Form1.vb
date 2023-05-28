@@ -273,8 +273,12 @@ Public Class Form1
             lightBrush.Dispose()
         End If
 
-        outlineText(e.Graphics, (If(night, "Night", "Day") + Str(day)), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(110, 60), StringAlignment.Near)
-        ' https://learn.microsoft.com/en-us/dotnet/visual-basic/language-reference/operators/if-operator Ternary operator to easily switch between day and night text
+        If night Then
+            outlineText(e.Graphics, ("Night" + Str(day)), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(110, 60), StringAlignment.Near)
+        Else
+            outlineText(e.Graphics, ("Day" + Str(day)), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(110, 60), StringAlignment.Near)
+        End If
+
         outline.Dispose()
 
         ' Day dial display
@@ -308,7 +312,7 @@ Public Class Form1
                 shopX.snapValue(0)
                 dayTransition.setValue(20)
                 ' TODO: Night mode
-                For Each obj In gameObjects.OfType(Of cauldron)
+                For Each obj In gameObjects
                     If obj.GetType() = GetType(cauldron) Then ' TODO: Source?
                         ' Replaces cauldrons with a movable version of themselves during the night
                         newObjects.AddLast(New editCauldron(obj))
@@ -727,34 +731,39 @@ Public Class cauldron
     Dim potionMenuActive As Boolean
     Dim totalTime As Integer = 10000
     Dim brewStage As Integer ' -1 for no brew, 0 for green, 1 for yellow, 2 for red
-    Dim ingredientHistory As LinkedList(Of Integer())
+    Dim ingredientHistory, fallingIngredients, fallenIngredients As LinkedList(Of Integer())
     Dim recipe(0 To 2, 0 To 3) As Integer
     Public type As Integer ' 0 for stone, 1 for iron, 2 for copper, 3 for gold
     ' Ingredients put into the cauldron will be stored in three separate "arrays" (based on the first index of the recipe array;
     ' one for each "stage" of brewing). The amount of the four hardcoded ingredients will be stored in the second index in the following order (CW):
     ' Shroom, Herb, Eye, Crystal
 
-    Public Sub New(x As Integer, y As Integer)
-        MyBase.New(x, y)
+    Public Sub New()
+        MyBase.New(0, 0)
         ingredientHistory = New LinkedList(Of Integer())
+        fallingIngredients = New LinkedList(Of Integer())
+        fallenIngredients = New LinkedList(Of Integer()) ' Essentially deadObjects (from Form1) for fallingIngredients
         recipe = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}} ' Here it may be easier to see how the ingredient amounts are stored,
         ' split into three separate "subarrays" for each of the three brewing stages.
-        sprite = My.Resources.Cauldron
-        type = 1
         potionMenuActive = False
         brewStage = -1
+    End Sub
+
+    Public Sub New(x As Integer, y As Integer)
+        Me.New()
+        Me.x = x
+        Me.y = y
+        sprite = My.Resources.Cauldron
+        type = 1
         setupStats()
     End Sub
 
     Public Sub New(base As editCauldron)
-        MyBase.New(base.x, base.y)
-        ingredientHistory = New LinkedList(Of Integer())
-        recipe = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}} ' Here it may be easier to see how the ingredient amounts are stored,
-        ' split into three separate "subarrays" for each of the three brewing stages.
-        sprite = base.sprite
+        Me.New()
+        Me.x = x
+        Me.y = y
+        Me.sprite = base.sprite
         Me.type = base.type
-        potionMenuActive = False
-        brewStage = -1
         setupStats()
     End Sub
 
@@ -786,6 +795,8 @@ Public Class cauldron
         Dim brewingAngle As Single = Math.Min(getBrewTime() * 180 / totalTime, 180) * Math.PI / 180 ' Same calculation as for the brew dial (with a lower bound), but converted to radians
         ingredientHistory.AddLast({ingredient, Math.Cos(brewingAngle) * -155, Math.Sin(brewingAngle) * 155})
         ' Stores the ingredient type, and the x and y (calculated from sine and cosine) (will be offset to center by cauldron at render)
+        fallingIngredients.AddLast({ingredient, sprite.Height + 10, 2})
+        ' Stored as type, y offset, and dy (velocity)
     End Sub
 
     Private Function getBrewTime() As Integer
@@ -807,13 +818,26 @@ Public Class cauldron
     End Sub
 
     Public Overrides Sub render(g As Graphics)
-        MyBase.render(g)
 
         ' Constants used for rendering
         Dim darkBrush As SolidBrush = New SolidBrush(Color.FromArgb(200, 10, 10, 10))
         Dim lightBrush As SolidBrush = New SolidBrush(Color.FromArgb(200, 200, 200, 200))
         Dim centerX As Integer = x + CInt(getBounds().Width / 2)
         Dim centerY As Integer = y + CInt(getBounds().Height / 2)
+
+        For Each ingredient In fallingIngredients
+            g.DrawImage({My.Resources.Shroom, My.Resources.Herb, My.Resources.Eye, My.Resources.Crystal}(ingredient(0)),
+                        New Rectangle(centerX - 30, centerY - ingredient(1), 60, 60))
+            ingredient(1) -= ingredient(2)
+            ingredient(2) += 1
+            If ingredient(1) <= 0 Then fallenIngredients.AddLast(ingredient)
+        Next
+
+        For Each ingredient In fallenIngredients
+            fallingIngredients.Remove(ingredient)
+        Next
+
+        MyBase.render(g)
 
         ' Rendering the brew stage dial
         If Not brewStage = -1 Then
