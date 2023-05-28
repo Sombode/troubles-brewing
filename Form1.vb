@@ -821,15 +821,13 @@ Public Class cauldron
 
     Public Overrides Sub tick()
         MyBase.tick()
-        If Not brewStage = -1 Then
-            If getBrewTime() > Math.Round(2 * totalTime / 3) Then ' Updating the brew stage
-                brewStage = 2
-            ElseIf getBrewTime() > Math.Round(totalTime / 3) Then
-                brewStage = 1
-            Else
-                brewStage = 0
-            End If
-        End If
+        If brewStage = -1 Then Return
+        Select Case brewStage ' Updating the brew stage
+            Case 0
+                If getBrewTime() > Math.Round(totalTime / 3) Then brewStage = 1
+            Case 1
+                If getBrewTime() > Math.Round(2 * totalTime / 3) Then brewStage = 2
+        End Select
     End Sub
 
     Public Overrides Sub render(g As Graphics)
@@ -839,6 +837,8 @@ Public Class cauldron
         Dim lightBrush As SolidBrush = New SolidBrush(Color.FromArgb(200, 200, 200, 200))
         Dim centerX As Integer = x + CInt(getBounds().Width / 2)
         Dim centerY As Integer = y + CInt(getBounds().Height / 2)
+
+        g.DrawString(brewStage, Form1.debugFont, Brushes.Black, New Point(x, y - 100))
 
         For Each ingredient In fallingIngredients
             Select Case ingredient(0)
@@ -920,19 +920,33 @@ Public Class cauldron
                 Form1.cleanArc(g, darkBrush, centerX, centerY, 225, 75, 0, 360)
                 If mouseDist > 40 And mouseDist < 110 Then
                     Dim mouseAngle = Math.Atan2(y + 100 - Form1.MousePosition.Y, x + 125 - Form1.MousePosition.X)
-                    If mouseAngle <= (Math.PI / 4) And mouseAngle >= (-Math.PI / 4) Then ' Left Section (Crystal)
-                        Form1.cleanArc(g, lightBrush, centerX, centerY, 225, 75, 135, 90)
-                        If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then addIngredient(3)
-                    ElseIf mouseAngle > (Math.PI / 4) And mouseAngle < (3 * Math.PI / 4) Then ' Top Section (Shroom)
-                        Form1.cleanArc(g, lightBrush, centerX, centerY, 225, 75, 225, 90)
-                        If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then addIngredient(0)
-                    ElseIf mouseAngle >= (3 * Math.PI / 4) Or mouseAngle <= (-3 * Math.PI / 4) Then ' Right Section (Herb)
-                        Form1.cleanArc(g, lightBrush, centerX, centerY, 225, 75, -45, 90)
-                        If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then addIngredient(1)
-                    ElseIf mouseAngle < (-Math.PI / 4) And mouseAngle > (-3 * Math.PI / 4) Then ' Bottom Section (Eye)
-                        Form1.cleanArc(g, lightBrush, centerX, centerY, 225, 75, 45, 90)
-                        If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then addIngredient(2)
-                    End If
+                    Select Case mouseAngle
+                        Case -Math.PI / 4 To Math.PI / 4
+                            Form1.cleanArc(g, lightBrush, centerX, centerY, 225, 75, 135, 90)
+                            If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then addIngredient(3)
+                        Case Math.PI / 4 To 3 * Math.PI / 4
+                            Form1.cleanArc(g, lightBrush, centerX, centerY, 225, 75, 225, 90)
+                            If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then addIngredient(0)
+                        Case -3 * Math.PI / 4 To -Math.PI / 4
+                            Form1.cleanArc(g, lightBrush, centerX, centerY, 225, 75, 45, 90)
+                            If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then addIngredient(2)
+                        Case Else
+                            Form1.cleanArc(g, lightBrush, centerX, centerY, 225, 75, -45, 90)
+                            If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then addIngredient(1)
+                    End Select
+                    'If mouseAngle <= (Math.PI / 4) And mouseAngle >= (-Math.PI / 4) Then ' Left Section (Crystal)
+                    '    Form1.cleanArc(g, lightBrush, centerX, centerY, 225, 75, 135, 90)
+                    '    If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then addIngredient(3)
+                    'ElseIf mouseAngle > (Math.PI / 4) And mouseAngle < (3 * Math.PI / 4) Then ' Top Section (Shroom)
+                    '    Form1.cleanArc(g, lightBrush, centerX, centerY, 225, 75, 225, 90)
+                    '    If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then addIngredient(0)
+                    'ElseIf mouseAngle >= (3 * Math.PI / 4) Or mouseAngle <= (-3 * Math.PI / 4) Then ' Right Section (Herb)
+                    '    Form1.cleanArc(g, lightBrush, centerX, centerY, 225, 75, -45, 90)
+                    '    If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then addIngredient(1)
+                    'ElseIf mouseAngle < (-Math.PI / 4) And mouseAngle > (-3 * Math.PI / 4) Then ' Bottom Section (Eye)
+                    '    Form1.cleanArc(g, lightBrush, centerX, centerY, 225, 75, 45, 90)
+                    '    If Not Form1.mouseLock AndAlso (Form1.MouseButtons = MouseButtons.Left) Then addIngredient(2)
+                    'End If
                 End If
                 g.DrawImage(My.Resources.Shroom, New Rectangle(centerX - 30, centerY - 105, 60, 60))
                 g.DrawImage(My.Resources.Herb, New Rectangle(centerX + 45, centerY - 30, 60, 60))
@@ -1256,7 +1270,7 @@ Public Class order
 
         timerBrush.Dispose()
 
-        If potionHover And orderHeight.getValue() > 274 Then g.DrawImage(My.Resources.SellOverlay, New Rectangle(x, y, sprite.Width, sprite.Height + 275))
+        If potionHover AndAlso orderHeight.getValue() > 274 Then g.DrawImage(My.Resources.SellOverlay, New Rectangle(x, y, sprite.Width, sprite.Height + 275))
 
         textPen.Dispose()
 
