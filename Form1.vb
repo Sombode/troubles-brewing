@@ -18,9 +18,11 @@ Public Class Form1
     Public newObjects, deadObjects As LinkedList(Of gameObject) ' Lists that will be used to modify gameObjects after iteration (as the direct list cannot be modified during iteration)
     Public mouseLock, grabLock, night As Boolean
     Public day As Integer
+    Public ordersDone As Integer ' Secretly kept for scoring
     Public gameOver As Boolean
     Public money As animatedValue = New animatedValue(100)
     Public dayTransition As animatedValue = New animatedValue(0)
+    Dim score As Integer = -1
     Dim shopX As animatedValue = New animatedValue(0)
     Dim shopOpen, titleOpen As Boolean
     Dim dayStart As DateTime
@@ -43,15 +45,16 @@ Public Class Form1
         mouseLock = False
         grabLock = False
         gameOver = False
+        night = False
+        titleOpen = True
         'gameObjects.AddFirst(New order(800, 300))
         'gameObjects.AddFirst(New order(900, 500))
         'gameObjects.AddFirst(New order(1000, 700))
         'gameObjects.AddFirst(New order(800, 300))
         'gameObjects.AddFirst(New cauldron(500, 500))
         debugFont = New Font(pfc.Families(0), 14)
-        titleOpen = True
-        day = 1
-        night = False
+        ordersDone = 0
+        day = 12 ' TODO: DEBUG
         dayStart = DateTime.Now
     End Sub
 
@@ -66,9 +69,59 @@ Public Class Form1
         ' Game Over Screen
         If mouseLock AndAlso (MouseButtons = MouseButtons.None) Then mouseLock = False
         Dim menuFont As Font = New Font(pfc.Families(0), 50)
+        Dim outline As Pen = New Pen(Color.Black, 5)
+        outline.LineJoin = LineJoin.Bevel
         g.DrawImage(My.Resources.GameOver, New Rectangle(Width / 2 - 285.5, 100, 571, 96))
         Dim restartButton As Rectangle = New Rectangle(Width / 2 - 158.5, 650, 317, 86)
         Dim exitButton As Rectangle = New Rectangle(Width / 2 - 158.5, 750, 317, 86)
+        ' Scoring
+        Dim orderBonus As Integer = ordersDone * 100
+        Dim dayBonus As Integer = day * 10
+        Dim assetsValue As Integer = 0
+        For Each cauldron In gameObjects.OfType(Of cauldron) ' Liquidating all bought objects into their pure monetary values
+            Select Case cauldron.type
+                Case 1
+                    assetsValue += 1000
+                Case 2
+                    assetsValue += 2500
+                Case 3
+                    assetsValue += 5000
+            End Select
+        Next
+        For Each cauldron In gameObjects.OfType(Of editCauldron) ' In case the game ends at night, literally the same code as above
+            Select Case cauldron.type
+                Case 1
+                    assetsValue += 1000
+                Case 2
+                    assetsValue += 2500
+                Case 3
+                    assetsValue += 5000
+            End Select
+        Next
+        For i = 1 To gameObjects.OfType(Of order).Count()
+            assetsValue += 50 * (2 ^ (i - 1))
+        Next
+        outlineText(g, "Balance", pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 - 50, 230), StringAlignment.Far)
+        outlineText(g, Str(money.getValue()).Trim(), pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 + 50, 230), StringAlignment.Near) ' TODO: MONEY CAN BE CAUGHT IN THE MIDDLE OF TRANSITION
+        outlineText(g, "Liquidated Assets", pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 - 50, 270), StringAlignment.Far)
+        outlineText(g, Str(assetsValue).Trim(), pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 + 50, 270), StringAlignment.Near)
+        outlineText(g, "Orders Completed (" + Str(ordersDone).Trim() + ")", pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 - 50, 310), StringAlignment.Far)
+        outlineText(g, Str(orderBonus).Trim(), pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 + 50, 310), StringAlignment.Near)
+        outlineText(g, "Days Passed (" + Str(day).Trim() + ")", pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 - 50, 350), StringAlignment.Far)
+        outlineText(g, Str(dayBonus).Trim(), pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 + 50, 350), StringAlignment.Near)
+
+        If score = -1 Then ' Generates score only if it wasn't already set (as this sub renders each tick)
+            score = money.getValue() + assetsValue + orderBonus + dayBonus
+            ' High scoring?
+        End If
+
+        outlineText(g, "Total Score", pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 - 50, 500), StringAlignment.Far)
+        outlineText(g, Str(score).Trim(), pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 + 50, 500), StringAlignment.Near)
+        outlineText(g, "High Score", pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 - 50, 540), StringAlignment.Far)
+        outlineText(g, Str(score).Trim(), pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 + 50, 540), StringAlignment.Near)
+
+        outline.Dispose()
+        ' Replay/Exit Buttons
         g.DrawImage(My.Resources.ReplayButton, restartButton)
         g.DrawImage(My.Resources.ExitButton, exitButton)
         If Not mouseLock AndAlso MouseButtons = MouseButtons.Left Then
@@ -78,7 +131,6 @@ Public Class Form1
                 Close()
             End If
         End If
-        ' TODO: Calc Score
     End Sub
 
     Private Sub Form1_Paint(sender As Object, e As PaintEventArgs) Handles Me.Paint
@@ -180,6 +232,7 @@ Public Class Form1
             outlineText(e.Graphics, FormatCurrency(money.getValue(), 0), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(90, Height - 50), StringAlignment.Near)
 
             If money.getValue() < 100 Then e.Graphics.DrawImage(My.Resources.Warning, New Rectangle(60, Height - 50, 40, 40))
+            ' Bankruptcy Warning
 
             dayTransition.updateValue()
 
@@ -221,6 +274,7 @@ Public Class Form1
                 e.Graphics.DrawImage(My.Resources.NextIcon, New Rectangle(27, 27 + 4.5 * dayTransition.getValue(), 66, 65))
 
                 If money.getValue() < 100 Then e.Graphics.DrawImage(My.Resources.Warning, New Rectangle(60, 60 + 4.5 * dayTransition.getValue(), 40, 40))
+                ' Bankruptcy Warning
 
                 ' Shop UI
 
@@ -365,33 +419,40 @@ Public Class Form1
                 e.Graphics.DrawImage(moon, New Rectangle(43, 93 - 50 * dayTransition.getValue() / 20, 33, 33))
             Else
                 If getDayTime() > 60000 Or Control.ModifierKeys = Keys.Shift Then
-                    night = True
-                    shopOpen = False
-                    shopX.snapValue(0)
-                    dayTransition.setValue(20)
-                    ' TODO: Night mode
-                    For Each obj In gameObjects
-                        If obj.GetType() = GetType(cauldron) Then ' TODO: Source?
-                            ' Replaces cauldrons with a movable version of themselves during the night
-                            newObjects.AddLast(New editCauldron(obj))
-                            deadObjects.AddLast(obj)
-                        ElseIf obj.GetType() = GetType(order) Then
-                            obj.deactivate()
-                        Else
-                            obj.kill()
-                        End If
-                    Next
+                    If day = 14 Then
+                        ' End game (end of time frame: 2 weeks)
+                        gameOver = True
+                    Else
+                        ' Transition into night
+                        night = True
+                        shopOpen = False
+                        shopX.snapValue(0)
+                        dayTransition.setValue(20)
+                        For Each obj In gameObjects
+                            If obj.GetType() = GetType(cauldron) Then ' TODO: Source?
+                                ' Replaces cauldrons with a movable version of themselves during the night
+                                newObjects.AddLast(New editCauldron(obj))
+                                deadObjects.AddLast(obj)
+                            ElseIf obj.GetType() = GetType(order) Then
+                                obj.deactivate()
+                            Else
+                                obj.kill()
+                            End If
+                        Next
+                    End If
                 End If
             End If
 
             e.Graphics.ResetClip()
 
+            If day = 14 Then e.Graphics.DrawImage(My.Resources.Warning, New Rectangle(60, 60, 40, 40)) ' Last Day Warning
+
             e.Graphics.DrawString((DateTime.Now.TimeOfDay - lastTick.TimeOfDay).TotalMilliseconds, debugFont, Brushes.Black, New Point(10, 100))
-            lastTick = DateTime.Now
+                lastTick = DateTime.Now
 
-        End If
+            End If
 
-        If (MouseButtons = MouseButtons.Left) Then mouseLock = True
+            If (MouseButtons = MouseButtons.Left) Then mouseLock = True
 
         Invalidate() ' Marks the form's area as "invalid" so that it will be redrawn
     End Sub
@@ -731,6 +792,7 @@ Public Class potion
         If Not IsNothing(selectedOrder) Then
             ' Selling a potion
             If Form1.concatRecipe(recipe) = Form1.concatRecipe(selectedOrder.recipe) Then
+                Form1.ordersDone += 1
                 Dim ingredientCount = 0
                 For stage = 0 To 2
                     For ingredient = 0 To 3
