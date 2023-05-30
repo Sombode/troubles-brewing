@@ -18,10 +18,10 @@ Public Class Form1
     Public newObjects, deadObjects As LinkedList(Of gameObject) ' Lists that will be used to modify gameObjects after iteration (as the direct list cannot be modified during iteration)
     Public mouseLock, grabLock, night As Boolean
     Public day As Integer
-    Public money As animatedValue = New animatedValue(500000)
+    Public money As animatedValue = New animatedValue(100)
     Public dayTransition As animatedValue = New animatedValue(0)
     Dim shopX As animatedValue = New animatedValue(0)
-    Dim shopOpen As Boolean
+    Dim shopOpen, titleOpen As Boolean
     Dim dayStart As DateTime
 
     Dim lastTick As DateTime ' DEBUG REMOVE THIS
@@ -44,9 +44,10 @@ Public Class Form1
         'gameObjects.AddFirst(New order(800, 300))
         'gameObjects.AddFirst(New order(900, 500))
         'gameObjects.AddFirst(New order(1000, 700))
-        gameObjects.AddFirst(New order(800, 300))
-        gameObjects.AddFirst(New cauldron(500, 500))
+        'gameObjects.AddFirst(New order(800, 300))
+        'gameObjects.AddFirst(New cauldron(500, 500))
         debugFont = New Font(pfc.Families(0), 14)
+        titleOpen = True
         day = 1
         night = False
         dayStart = DateTime.Now
@@ -75,264 +76,283 @@ Public Class Form1
         ' https://stackoverflow.com/questions/50794158/how-can-i-detect-the-pressed-key-in-vb-net
 
         tick()
+
         ' According to https://stackoverflow.com/questions/57497422/how-to-stop-flickering-when-redrawing-ellipses-in-windows-forms,
         ' it is faster to use the Graphics from the PaintEventArgs of the Paint event rather than CreateGraphics(), which removes any flickering when redrawing
 
-        ' Iterating through specific types (using OfType(Of ...)) so that types of objects are properly layered when drawn (cauldrons then orders then potions)
-
-        For Each cauldron In gameObjects.OfType(Of editCauldron).Reverse()
-            cauldron.render(e.Graphics)
-        Next
-
-        For Each cauldron In gameObjects.OfType(Of cauldron).Reverse() ' Reversing these lists when rendering for 2 key reasons:
-            cauldron.render(e.Graphics)
-        Next
-
-        For Each order In gameObjects.OfType(Of order).Reverse() ' 1 - So that draggable objects (which are grabbed with priority from the front of the list)
-            ' are rendered in front of draggable objects with less priority (towards the back)
-            order.render(e.Graphics)
-        Next
-
-        For Each potion In gameObjects.OfType(Of potion).Reverse() ' 2 - moveToFront() adds to the front (an easy change to fix but it works with reason 1 so I'm keeping it like this)
-            potion.render(e.Graphics)
-        Next
-
-        For Each cauldron In gameObjects.OfType(Of cauldron).Reverse() ' Reversing these lists when rendering for 2 key reasons:
-            cauldron.renderUI(e.Graphics)
-        Next
-
-        ' Removing no longer needed objects post loop
-
-        For Each deadObj In deadObjects
-            gameObjects.Remove(deadObj)
-        Next
-
-        deadObjects.Clear()
-
-        ' Adding in new objects post loop
-
-        For Each newObj In newObjects
-            gameObjects.AddFirst(newObj)
-        Next
-
-        newObjects.Clear()
-
-        ' Money display
-
-        Dim coin As Image = My.Resources.Coin
-        Dim outline As Pen = New Pen(Color.Black, 10)
-
-        outline.LineJoin = LineJoin.Bevel
-
-        money.updateValue()
-
-        e.Graphics.DrawImage(coin, New Rectangle(5, Height - coin.Height - 5, coin.Width, coin.Height))
-        outlineText(e.Graphics, FormatCurrency(money.getValue(), 0), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(90, Height - 50), StringAlignment.Near)
-
-        dayTransition.updateValue()
-
-        If night Or Not dayTransition.done Then
-
-            Dim darkBrush As SolidBrush = New SolidBrush(Color.FromArgb(200, 10, 10, 10))
-            Dim dimBrush As SolidBrush = New SolidBrush(Color.FromArgb(200, 100, 100, 100))
-            Dim lightBrush As SolidBrush = New SolidBrush(Color.FromArgb(255, 200, 200, 200))
-
-            ' Next day button
-
-            Dim nextButton As GraphicsPath = New GraphicsPath()
-
-            nextButton.AddEllipse(New Rectangle(27, 27 + 4.5 * dayTransition.getValue(), 66, 65))
-
-            If nextButton.IsVisible(MousePosition) Then ' Essentially .contains(Point) for graphics paths https://stackoverflow.com/questions/4816297/how-to-know-if-a-graphicspath-contains-a-point-in-c-sharp
-                e.Graphics.FillPath(dimBrush, nextButton)
-                If Not mouseLock AndAlso MouseButtons = MouseButtons.Left Then
-                    ' Return to day
-                    For Each cauldron In gameObjects.OfType(Of editCauldron)
-                        cauldron.transmute()
-                    Next
-                    dayTransition.setValue(0)
-                    night = False
-                    day += 1
-                    dayStart = DateTime.Now
-                    For Each order In gameObjects.OfType(Of order)
-                        order.reactivate()
-                    Next
-                End If
-            Else
-                e.Graphics.FillPath(darkBrush, nextButton)
+        If titleOpen Then
+            ' Title Screen
+            Dim buttonRect As Rectangle = New Rectangle(Width / 2 - 158.5, 650, 317, 86)
+            e.Graphics.DrawImage(My.Resources.Title, New Rectangle(Width / 2 - 439, 100, 878, 434))
+            e.Graphics.DrawImage(My.Resources.PlayButton, buttonRect)
+            If Not mouseLock AndAlso buttonRect.Contains(MousePosition) AndAlso MouseButtons = MouseButtons.Left Then
+                ' Start Game
+                titleOpen = False
+                day = 1
+                night = False
+                dayStart = DateTime.Now
+                gameObjects.AddFirst(New order(Width - 300, 50))
+                gameObjects.AddFirst(New cauldron(Width / 2 - 125, Height / 2))
             End If
+        Else
 
-            e.Graphics.DrawImage(My.Resources.NextIcon, New Rectangle(27, 27 + 4.5 * dayTransition.getValue(), 66, 65))
+            ' Iterating through specific types (using OfType(Of ...)) so that types of objects are properly layered when drawn (cauldrons then orders then potions)
 
-            ' Shop UI
+            For Each cauldron In gameObjects.OfType(Of editCauldron).Reverse()
+                cauldron.render(e.Graphics)
+            Next
 
-            Dim shopToggle As GraphicsPath = New GraphicsPath()
-            Dim shopFont As Font = New Font(pfc.Families(0), 40)
-            Dim shopFormat As StringFormat = New StringFormat()
-            Dim selectedItem As Integer = -1
+            For Each cauldron In gameObjects.OfType(Of cauldron).Reverse() ' Reversing these lists when rendering for 2 key reasons:
+                cauldron.render(e.Graphics)
+            Next
 
-            shopFormat.Alignment = StringAlignment.Center
+            For Each order In gameObjects.OfType(Of order).Reverse() ' 1 - So that draggable objects (which are grabbed with priority from the front of the list)
+                ' are rendered in front of draggable objects with less priority (towards the back)
+                order.render(e.Graphics)
+            Next
 
-            shopX.updateValue()
+            For Each potion In gameObjects.OfType(Of potion).Reverse() ' 2 - moveToFront() adds to the front (an easy change to fix but it works with reason 1 so I'm keeping it like this)
+                potion.render(e.Graphics)
+            Next
 
-            shopToggle.AddPie(New Rectangle(Width + shopX.getValue() + (dayTransition.getValue() * -3), Height / 2 - 50, 100, 100), 90, 180)
+            For Each cauldron In gameObjects.OfType(Of cauldron).Reverse() ' Reversing these lists when rendering for 2 key reasons:
+                cauldron.renderUI(e.Graphics)
+            Next
 
-            If shopToggle.IsVisible(MousePosition) Then
-                e.Graphics.FillPath(dimBrush, shopToggle)
-                If Not mouseLock AndAlso MouseButtons = MouseButtons.Left Then
-                    If shopOpen Then
-                        shopX.setValue(0)
-                    Else
-                        shopX.setValue(-300)
-                    End If
-                    shopOpen = Not shopOpen
-                End If
-            Else
-                e.Graphics.FillPath(darkBrush, shopToggle)
-            End If
+            ' Removing no longer needed objects post loop
 
-            e.Graphics.FillRectangle(lightBrush, New Rectangle(Width + 5 + shopX.getValue() + (dayTransition.getValue() * -3), Height / 2 - 5, 40, 10))
+            For Each deadObj In deadObjects
+                gameObjects.Remove(deadObj)
+            Next
 
-            If shopOpen Or Not shopX.done Then
-                For i = 0 To 3
-                    Dim button As Rectangle = New Rectangle(Width + 5 + shopX.getValue(), 17.5 + 265 * i, 275, 250)
-                    If button.Contains(MousePosition) Then
-                        e.Graphics.FillRectangle(dimBrush, button)
-                        selectedItem = i
-                    Else
-                        e.Graphics.FillRectangle(darkBrush, button)
-                    End If
-                    Select Case i ' TODO: MOVE LINK (BELOW) TO FIRST INSTANCE OF SELECT CASE
-                        Case 0
-                            e.Graphics.DrawImage(My.Resources.OrderShop, New Rectangle(Width + 17.5 + shopX.getValue(), 60 + 265 * i, 245, 102))
-                        Case 1
-                            e.Graphics.DrawImage(My.Resources.Cauldron, New Rectangle(Width + 17.5 + shopX.getValue(), 20 + 265 * i, 250, 200))
-                        Case 2
-                            e.Graphics.DrawImage(My.Resources.CopperCauldron, New Rectangle(Width + 17.5 + shopX.getValue(), 20 + 265 * i, 250, 200))
-                        Case 3
-                            e.Graphics.DrawImage(My.Resources.GoldCauldron, New Rectangle(Width + 17.5 + shopX.getValue(), 20 + 265 * i, 250, 200))
-                    End Select
-                    'e.Graphics.DrawImage({My.Resources.RockCauldron, My.Resources.Cauldron, My.Resources.CopperCauldron, My.Resources.GoldCauldron}(i),
-                    '                     New Rectangle(Width + 17.5 + shopX.getValue(), 20 + 265 * i, 250, 200))
-                    e.Graphics.DrawString("$1000", shopFont, lightBrush, New Point(Width + 145 + shopX.getValue(), 210 + 265 * i), shopFormat)
-                Next
-            Else
-                e.Graphics.FillRectangle(lightBrush, New Rectangle(Width + 20 + shopX.getValue() + (dayTransition.getValue() * -3), Height / 2 - 20, 10, 40))
-            End If
+            deadObjects.Clear()
 
-            If Not selectedItem = -1 Then
-                Dim descriptionFont As Font = New Font(pfc.Families(0), 24)
-                shopFormat.Alignment = StringAlignment.Near
-                e.Graphics.FillRectangle(darkBrush, New Rectangle(Width - 510 + shopX.getValue(), 17.5, 500, 300))
-                If selectedItem = 0 Then ' TODO: Tweak prices
-                    e.Graphics.DrawString("Order Parchment", shopFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 17.5), shopFormat)
-                    e.Graphics.DrawString("Another slot to hold more orders.", descriptionFont, lightBrush, New Point(Width - 500 + shopX.getValue(), 100), shopFormat)
-                    If money.getValue() < 1000 Then e.Graphics.DrawString("You cannot afford this!", descriptionFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 280), shopFormat)
-                    If Not mouseLock AndAlso MouseButtons = MouseButtons.Left AndAlso money.getValue() >= 1000 Then
-                        shopX.setValue(0)
-                        shopOpen = False
-                        money.addValue(-1000)
-                        resetDrag()
-                        newObjects.AddLast(New order(MousePosition, New Point(-125, -15)))
-                    End If
-                ElseIf selectedItem = 1 Then
-                    e.Graphics.DrawString("Iron Cauldron", shopFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 17.5), shopFormat)
-                    e.Graphics.DrawString("A basic cauldron.", descriptionFont, lightBrush, New Point(Width - 500 + shopX.getValue(), 100), shopFormat)
-                    If money.getValue() < 1000 Then e.Graphics.DrawString("You cannot afford this!", descriptionFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 280), shopFormat)
-                    If Not mouseLock AndAlso MouseButtons = MouseButtons.Left AndAlso money.getValue() >= 1000 Then
-                        shopX.setValue(0)
-                        shopOpen = False
-                        money.addValue(-1000)
-                        resetDrag()
-                        newObjects.AddLast(New editCauldron(MousePosition, My.Resources.Cauldron, New Point(-125, -100), 1))
-                    End If
-                ElseIf selectedItem = 2 Then
-                    e.Graphics.DrawString("Copper Cauldron", shopFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 17.5), shopFormat)
-                    e.Graphics.DrawString("A better, faster cauldron.", descriptionFont, lightBrush, New Point(Width - 500 + shopX.getValue(), 100), shopFormat)
-                    If money.getValue() < 1000 Then e.Graphics.DrawString("You cannot afford this!", descriptionFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 280), shopFormat)
-                    If Not mouseLock AndAlso MouseButtons = MouseButtons.Left AndAlso money.getValue() >= 1000 Then
-                        shopX.setValue(0)
-                        shopOpen = False
-                        money.addValue(-1000)
-                        resetDrag()
-                        newObjects.AddLast(New editCauldron(MousePosition, My.Resources.CopperCauldron, New Point(-125, -100), 2))
+            ' Adding in new objects post loop
+
+            For Each newObj In newObjects
+                gameObjects.AddFirst(newObj)
+            Next
+
+            newObjects.Clear()
+
+            ' Money display
+
+            Dim coin As Image = My.Resources.Coin
+            Dim outline As Pen = New Pen(Color.Black, 10)
+
+            outline.LineJoin = LineJoin.Bevel
+
+            money.updateValue()
+
+            e.Graphics.DrawImage(coin, New Rectangle(5, Height - coin.Height - 5, coin.Width, coin.Height))
+            outlineText(e.Graphics, FormatCurrency(money.getValue(), 0), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(90, Height - 50), StringAlignment.Near)
+
+            dayTransition.updateValue()
+
+            If night Or Not dayTransition.done Then
+
+                Dim darkBrush As SolidBrush = New SolidBrush(Color.FromArgb(200, 10, 10, 10))
+                Dim dimBrush As SolidBrush = New SolidBrush(Color.FromArgb(200, 100, 100, 100))
+                Dim lightBrush As SolidBrush = New SolidBrush(Color.FromArgb(255, 200, 200, 200))
+
+                ' Next day button
+
+                Dim nextButton As GraphicsPath = New GraphicsPath()
+
+                nextButton.AddEllipse(New Rectangle(27, 27 + 4.5 * dayTransition.getValue(), 66, 65))
+
+                If nextButton.IsVisible(MousePosition) Then ' Essentially .contains(Point) for graphics paths https://stackoverflow.com/questions/4816297/how-to-know-if-a-graphicspath-contains-a-point-in-c-sharp
+                    e.Graphics.FillPath(dimBrush, nextButton)
+                    If Not mouseLock AndAlso MouseButtons = MouseButtons.Left Then
+                        ' Return to day
+                        For Each cauldron In gameObjects.OfType(Of editCauldron)
+                            cauldron.transmute()
+                        Next
+                        dayTransition.setValue(0)
+                        night = False
+                        day += 1
+                        dayStart = DateTime.Now
+                        For Each order In gameObjects.OfType(Of order)
+                            order.reactivate()
+                        Next
                     End If
                 Else
-                    e.Graphics.DrawString("Gold Cauldron", shopFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 17.5), shopFormat)
-                    e.Graphics.DrawString("Fast. Not for the faint of heart.", descriptionFont, lightBrush, New Point(Width - 500 + shopX.getValue(), 100), shopFormat)
-                    If money.getValue() < 1000 Then e.Graphics.DrawString("You cannot afford this!", descriptionFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 280), shopFormat)
-                    If Not mouseLock AndAlso MouseButtons = MouseButtons.Left AndAlso money.getValue() >= 1000 Then
-                        shopX.setValue(0)
-                        shopOpen = False
-                        money.addValue(-1000)
-                        resetDrag()
-                        newObjects.AddLast(New editCauldron(MousePosition, My.Resources.GoldCauldron, New Point(-125, -100), 3))
+                    e.Graphics.FillPath(darkBrush, nextButton)
+                End If
+
+                e.Graphics.DrawImage(My.Resources.NextIcon, New Rectangle(27, 27 + 4.5 * dayTransition.getValue(), 66, 65))
+
+                ' Shop UI
+
+                Dim shopToggle As GraphicsPath = New GraphicsPath()
+                Dim shopFont As Font = New Font(pfc.Families(0), 40)
+                Dim shopFormat As StringFormat = New StringFormat()
+                Dim selectedItem As Integer = -1
+
+                shopFormat.Alignment = StringAlignment.Center
+
+                shopX.updateValue()
+
+                shopToggle.AddPie(New Rectangle(Width + shopX.getValue() + (dayTransition.getValue() * -3), Height / 2 - 50, 100, 100), 90, 180)
+
+                If shopToggle.IsVisible(MousePosition) Then
+                    e.Graphics.FillPath(dimBrush, shopToggle)
+                    If Not mouseLock AndAlso MouseButtons = MouseButtons.Left Then
+                        If shopOpen Then
+                            shopX.setValue(0)
+                        Else
+                            shopX.setValue(-300)
+                        End If
+                        shopOpen = Not shopOpen
                     End If
+                Else
+                    e.Graphics.FillPath(darkBrush, shopToggle)
+                End If
+
+                e.Graphics.FillRectangle(lightBrush, New Rectangle(Width + 5 + shopX.getValue() + (dayTransition.getValue() * -3), Height / 2 - 5, 40, 10))
+
+                If shopOpen Or Not shopX.done Then
+                    For i = 0 To 3
+                        Dim button As Rectangle = New Rectangle(Width + 5 + shopX.getValue(), 17.5 + 265 * i, 275, 250)
+                        If button.Contains(MousePosition) Then
+                            e.Graphics.FillRectangle(dimBrush, button)
+                            selectedItem = i
+                        Else
+                            e.Graphics.FillRectangle(darkBrush, button)
+                        End If
+                        Select Case i ' TODO: MOVE LINK (BELOW) TO FIRST INSTANCE OF SELECT CASE
+                            Case 0
+                                e.Graphics.DrawImage(My.Resources.OrderShop, New Rectangle(Width + 17.5 + shopX.getValue(), 60 + 265 * i, 245, 102))
+                            Case 1
+                                e.Graphics.DrawImage(My.Resources.Cauldron, New Rectangle(Width + 17.5 + shopX.getValue(), 20 + 265 * i, 250, 200))
+                            Case 2
+                                e.Graphics.DrawImage(My.Resources.CopperCauldron, New Rectangle(Width + 17.5 + shopX.getValue(), 20 + 265 * i, 250, 200))
+                            Case 3
+                                e.Graphics.DrawImage(My.Resources.GoldCauldron, New Rectangle(Width + 17.5 + shopX.getValue(), 20 + 265 * i, 250, 200))
+                        End Select
+                        'e.Graphics.DrawImage({My.Resources.RockCauldron, My.Resources.Cauldron, My.Resources.CopperCauldron, My.Resources.GoldCauldron}(i),
+                        '                     New Rectangle(Width + 17.5 + shopX.getValue(), 20 + 265 * i, 250, 200))
+                        e.Graphics.DrawString("$1000", shopFont, lightBrush, New Point(Width + 145 + shopX.getValue(), 210 + 265 * i), shopFormat)
+                    Next
+                Else
+                    e.Graphics.FillRectangle(lightBrush, New Rectangle(Width + 20 + shopX.getValue() + (dayTransition.getValue() * -3), Height / 2 - 20, 10, 40))
+                End If
+
+                If Not selectedItem = -1 Then
+                    Dim descriptionFont As Font = New Font(pfc.Families(0), 24)
+                    shopFormat.Alignment = StringAlignment.Near
+                    e.Graphics.FillRectangle(darkBrush, New Rectangle(Width - 510 + shopX.getValue(), 17.5, 500, 300))
+                    If selectedItem = 0 Then ' TODO: Tweak prices
+                        e.Graphics.DrawString("Order Parchment", shopFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 17.5), shopFormat)
+                        e.Graphics.DrawString("Another slot to hold more orders.", descriptionFont, lightBrush, New Point(Width - 500 + shopX.getValue(), 100), shopFormat)
+                        If money.getValue() < 1000 Then e.Graphics.DrawString("You cannot afford this!", descriptionFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 280), shopFormat)
+                        If Not mouseLock AndAlso MouseButtons = MouseButtons.Left AndAlso money.getValue() >= 1000 Then
+                            shopX.setValue(0)
+                            shopOpen = False
+                            money.addValue(-1000)
+                            resetDrag()
+                            newObjects.AddLast(New order(MousePosition, New Point(-125, -15)))
+                        End If
+                    ElseIf selectedItem = 1 Then
+                        e.Graphics.DrawString("Iron Cauldron", shopFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 17.5), shopFormat)
+                        e.Graphics.DrawString("A basic cauldron.", descriptionFont, lightBrush, New Point(Width - 500 + shopX.getValue(), 100), shopFormat)
+                        If money.getValue() < 1000 Then e.Graphics.DrawString("You cannot afford this!", descriptionFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 280), shopFormat)
+                        If Not mouseLock AndAlso MouseButtons = MouseButtons.Left AndAlso money.getValue() >= 1000 Then
+                            shopX.setValue(0)
+                            shopOpen = False
+                            money.addValue(-1000)
+                            resetDrag()
+                            newObjects.AddLast(New editCauldron(MousePosition, My.Resources.Cauldron, New Point(-125, -100), 1))
+                        End If
+                    ElseIf selectedItem = 2 Then
+                        e.Graphics.DrawString("Copper Cauldron", shopFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 17.5), shopFormat)
+                        e.Graphics.DrawString("A better, faster cauldron.", descriptionFont, lightBrush, New Point(Width - 500 + shopX.getValue(), 100), shopFormat)
+                        If money.getValue() < 1000 Then e.Graphics.DrawString("You cannot afford this!", descriptionFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 280), shopFormat)
+                        If Not mouseLock AndAlso MouseButtons = MouseButtons.Left AndAlso money.getValue() >= 1000 Then
+                            shopX.setValue(0)
+                            shopOpen = False
+                            money.addValue(-1000)
+                            resetDrag()
+                            newObjects.AddLast(New editCauldron(MousePosition, My.Resources.CopperCauldron, New Point(-125, -100), 2))
+                        End If
+                    Else
+                        e.Graphics.DrawString("Gold Cauldron", shopFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 17.5), shopFormat)
+                        e.Graphics.DrawString("Fast. Not for the faint of heart.", descriptionFont, lightBrush, New Point(Width - 500 + shopX.getValue(), 100), shopFormat)
+                        If money.getValue() < 1000 Then e.Graphics.DrawString("You cannot afford this!", descriptionFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 280), shopFormat)
+                        If Not mouseLock AndAlso MouseButtons = MouseButtons.Left AndAlso money.getValue() >= 1000 Then
+                            shopX.setValue(0)
+                            shopOpen = False
+                            money.addValue(-1000)
+                            resetDrag()
+                            newObjects.AddLast(New editCauldron(MousePosition, My.Resources.GoldCauldron, New Point(-125, -100), 3))
+                        End If
+                    End If
+                End If
+
+                darkBrush.Dispose()
+                dimBrush.Dispose()
+                lightBrush.Dispose()
+            End If
+
+            If night Then
+                outlineText(e.Graphics, ("Night" + Str(day)), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(110, 60), StringAlignment.Near)
+            Else
+                outlineText(e.Graphics, ("Day" + Str(day)), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(110, 60), StringAlignment.Near)
+            End If
+
+            outline.Dispose()
+
+            ' Day dial display
+
+            Dim dayDial As Image = My.Resources.DayDial
+            Dim circleClip As GraphicsPath = New GraphicsPath()
+
+            circleClip.AddEllipse(New Rectangle(27, 27, 66, 65))
+
+            e.Graphics.DrawImage(dayDial, New Rectangle(10, 10, dayDial.Width, dayDial.Height))
+
+            e.Graphics.SetClip(circleClip)
+
+            Dim sun As Rectangle = New Rectangle(43, 43 + getDayTime() / 6000 * 5, 33, 33) ' Days last 3 minutes (180000 milliseconds), moving the sun down 50 pixels
+            Dim sunBrush As SolidBrush = New SolidBrush(Color.FromArgb(240, 201, 61))
+            Dim sunPen As Pen = New Pen(Color.FromArgb(223, 177, 58), 5)
+            e.Graphics.FillEllipse(sunBrush, sun)
+            e.Graphics.DrawEllipse(sunPen, sun)
+            sunBrush.Dispose()
+            sunPen.Dispose()
+
+            If night Or Not dayTransition.done Then
+                Dim moon As Image = My.Resources.Moon
+                Dim nightBrush As SolidBrush = New SolidBrush(Color.FromArgb(CInt(dayTransition.getValue() / 20 * 255), 90, 69, 105))
+                e.Graphics.FillPath(nightBrush, circleClip)
+                e.Graphics.DrawImage(moon, New Rectangle(43, 93 - 50 * dayTransition.getValue() / 20, 33, 33))
+            Else
+                If getDayTime() > 60000 Then
+                    night = True
+                    shopOpen = False
+                    shopX.snapValue(0)
+                    dayTransition.setValue(20)
+                    ' TODO: Night mode
+                    For Each obj In gameObjects
+                        If obj.GetType() = GetType(cauldron) Then ' TODO: Source?
+                            ' Replaces cauldrons with a movable version of themselves during the night
+                            newObjects.AddLast(New editCauldron(obj))
+                            deadObjects.AddLast(obj)
+                        ElseIf obj.GetType() = GetType(order) Then
+                            obj.deactivate()
+                        Else
+                            obj.kill()
+                        End If
+                    Next
                 End If
             End If
 
-            darkBrush.Dispose()
-            dimBrush.Dispose()
-            lightBrush.Dispose()
+            e.Graphics.ResetClip()
+
+            e.Graphics.DrawString((DateTime.Now.TimeOfDay - lastTick.TimeOfDay).TotalMilliseconds, debugFont, Brushes.Black, New Point(10, 100))
+            lastTick = DateTime.Now
+
         End If
-
-        If night Then
-            outlineText(e.Graphics, ("Night" + Str(day)), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(110, 60), StringAlignment.Near)
-        Else
-            outlineText(e.Graphics, ("Day" + Str(day)), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(110, 60), StringAlignment.Near)
-        End If
-
-        outline.Dispose()
-
-        ' Day dial display
-
-        Dim dayDial As Image = My.Resources.DayDial
-        Dim circleClip As GraphicsPath = New GraphicsPath()
-
-        circleClip.AddEllipse(New Rectangle(27, 27, 66, 65))
-
-        e.Graphics.DrawImage(dayDial, New Rectangle(10, 10, dayDial.Width, dayDial.Height))
-
-        e.Graphics.SetClip(circleClip)
-
-        Dim sun As Rectangle = New Rectangle(43, 43 + getDayTime() / 6000 * 5, 33, 33) ' Days last 3 minutes (180000 milliseconds), moving the sun down 50 pixels
-        Dim sunBrush As SolidBrush = New SolidBrush(Color.FromArgb(240, 201, 61))
-        Dim sunPen As Pen = New Pen(Color.FromArgb(223, 177, 58), 5)
-        e.Graphics.FillEllipse(sunBrush, sun)
-        e.Graphics.DrawEllipse(sunPen, sun)
-        sunBrush.Dispose()
-        sunPen.Dispose()
-
-        If night Or Not dayTransition.done Then
-            Dim moon As Image = My.Resources.Moon
-            Dim nightBrush As SolidBrush = New SolidBrush(Color.FromArgb(CInt(dayTransition.getValue() / 20 * 255), 90, 69, 105))
-            e.Graphics.FillPath(nightBrush, circleClip)
-            e.Graphics.DrawImage(moon, New Rectangle(43, 93 - 50 * dayTransition.getValue() / 20, 33, 33))
-        Else
-            If getDayTime() > 1000 Then
-                night = True
-                shopOpen = False
-                shopX.snapValue(0)
-                dayTransition.setValue(20)
-                ' TODO: Night mode
-                For Each obj In gameObjects
-                    If obj.GetType() = GetType(cauldron) Then ' TODO: Source?
-                        ' Replaces cauldrons with a movable version of themselves during the night
-                        newObjects.AddLast(New editCauldron(obj))
-                        deadObjects.AddLast(obj)
-                    ElseIf obj.GetType() = GetType(order) Then
-                        obj.deactivate()
-                    Else
-                        obj.kill()
-                    End If
-                Next
-            End If
-        End If
-
-        e.Graphics.ResetClip()
-
-        e.Graphics.DrawString((DateTime.Now.TimeOfDay - lastTick.TimeOfDay).TotalMilliseconds, debugFont, Brushes.Black, New Point(10, 100))
-        lastTick = DateTime.Now
 
         If (MouseButtons = MouseButtons.Left) Then mouseLock = True
 
@@ -756,7 +776,7 @@ Public Class cauldron
     Dim recipe(0 To 2, 0 To 3) As Integer
     Dim ingredientHistory As Bitmap
     Dim historyGraphics As Graphics
-    Public type As Integer ' 0 for stone, 1 for iron, 2 for copper, 3 for gold
+    Public type As Integer ' 1 for iron, 2 for copper, 3 for gold
     ' Ingredients put into the cauldron will be stored in three separate "arrays" (based on the first index of the recipe array;
     ' one for each "stage" of brewing). The amount of the four hardcoded ingredients will be stored in the second index in the following order (CW):
     ' Shroom, Herb, Eye, Crystal
@@ -805,9 +825,6 @@ Public Class cauldron
 
     Private Sub setupStats()
         Select Case type
-            Case 0
-                ' Rock
-                totalTime = 30000
             Case 1
                 ' Iron
                 totalTime = 15000
@@ -821,6 +838,8 @@ Public Class cauldron
     End Sub
 
     Private Sub addIngredient(ingredient As Integer)
+        If Form1.money.getValue < 10 Then Return ' Check money
+        Form1.money.addValue(-10)
         If brewStage = -1 AndAlso recipe(0, 0) + recipe(0, 1) + recipe(0, 2) + recipe(0, 3) = 0 Then
             ' Starts the brewing timer if this is the first ingredient added
             ' Adding up the values of the first four items to effectively check if they all equal 0 (otherwise the sum is not 0).
@@ -829,7 +848,6 @@ Public Class cauldron
             brewStage = 0
         End If
         recipe(brewStage, ingredient) += 1
-        Form1.money.addValue(-10)
         Dim brewingAngle As Single = Math.Min(getBrewTime() * 180 / totalTime, 180) * Math.PI / 180 ' Same calculation as for the brew dial (with a lower bound), but converted to radians
         Select Case ingredient ' Adding the ingredients at their positions (via sin and cos of the brewing angle) on the history to the bitmap 
             Case 0
@@ -866,8 +884,6 @@ Public Class cauldron
         ' Constants used for rendering
         Dim centerX As Integer = x + CInt(sprite.Width / 2)
         Dim centerY As Integer = y + CInt(sprite.Height / 2)
-
-        g.DrawString(brewStage, Form1.debugFont, Brushes.Black, New Point(x, y - 100))
 
         For Each ingredient In fallingIngredients
             Select Case ingredient(0)
