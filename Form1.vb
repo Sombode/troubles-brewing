@@ -18,7 +18,7 @@ Public Class Form1
     Public newObjects, deadObjects As LinkedList(Of gameObject) ' Lists that will be used to modify gameObjects after iteration (as the direct list cannot be modified during iteration)
     Public mouseLock, grabLock, night As Boolean
     Public day As Integer
-    Public money As animatedValue = New animatedValue(100)
+    Public money As animatedValue = New animatedValue(1000)
     Public dayTransition As animatedValue = New animatedValue(0)
     Dim shopX As animatedValue = New animatedValue(0)
     Dim shopOpen, titleOpen As Boolean
@@ -295,9 +295,9 @@ Public Class Form1
             End If
 
             If night Then
-                outlineText(e.Graphics, ("Night" + Str(day)), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(110, 60), StringAlignment.Near)
+                outlineText(e.Graphics, ("Night" + Str(day) + "/14"), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(110, 60), StringAlignment.Near)
             Else
-                outlineText(e.Graphics, ("Day" + Str(day)), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(110, 60), StringAlignment.Near)
+                outlineText(e.Graphics, ("Day" + Str(day) + "/14"), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(110, 60), StringAlignment.Near)
             End If
 
             outline.Dispose()
