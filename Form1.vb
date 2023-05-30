@@ -22,7 +22,6 @@ Public Class Form1
     Public dayTransition As animatedValue = New animatedValue(0)
     Dim shopX As animatedValue = New animatedValue(0)
     Dim shopOpen As Boolean
-    Dim pendingOrders(3) As Integer
     Dim dayStart As DateTime
 
     Dim lastTick As DateTime ' DEBUG REMOVE THIS
@@ -34,6 +33,8 @@ Public Class Form1
     Public debugFont As Font ' TODO: Remove
 
     Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        pfc.AddFontFile(Application.StartupPath.Replace("bin\Debug", "Resources\GermaniaOne-Regular.ttf")) ' An objectively bad way to import a custom font,
+        ' but it works (as long as the project stays unpackaged) and I don't have to touch pointers (the alternative is AddMemoryFont, which is too complex).
         Randomize()
         gameObjects = New LinkedList(Of gameObject)
         newObjects = New LinkedList(Of gameObject)
@@ -43,16 +44,12 @@ Public Class Form1
         'gameObjects.AddFirst(New order(800, 300))
         'gameObjects.AddFirst(New order(900, 500))
         'gameObjects.AddFirst(New order(1000, 700))
+        gameObjects.AddFirst(New order(800, 300))
         gameObjects.AddFirst(New cauldron(500, 500))
-        pfc.AddFontFile(Application.StartupPath.Replace("bin\Debug", "Resources\GermaniaOne-Regular.ttf")) ' An objectively bad way to import a custom font,
-        ' but it works (as long as the project stays unpackaged) and I don't have to touch pointers (the alternative is AddMemoryFont, which is too complex).
         debugFont = New Font(pfc.Families(0), 14)
         day = 1
         night = False
         dayStart = DateTime.Now
-        pendingOrders(0) = Math.Round(Rnd() * 3)
-        pendingOrders(1) = Math.Round(Rnd() * 2)
-        pendingOrders(2) = Math.Round(Rnd() * 1)
     End Sub
 
     Private Sub tick()
@@ -60,28 +57,6 @@ Public Class Form1
         For Each gameObj In gameObjects ' idea: combine tick and render into one loop? depends on interactions, would reduce iterations with more objects
             gameObj.tick()
         Next
-        If pendingOrders(0) > 0 And getDayTime() > 0 Then
-            For i = 0 To pendingOrders(0)
-                newObjects.AddFirst(New order(i))
-            Next
-            pendingOrders(0) = 0
-        End If
-        If pendingOrders(1) > 0 And getDayTime() > 55000 Then
-            For i = 0 To pendingOrders(1)
-                newObjects.AddFirst(New order(i))
-            Next
-            pendingOrders(1) = 0
-        End If
-        If pendingOrders(2) > 0 And getDayTime() > 110000 Then
-            For i = 0 To pendingOrders(2)
-                newObjects.AddFirst(New order(i))
-            Next
-            pendingOrders(2) = 0
-        End If
-    End Sub
-
-    Private Sub Button1_Click(sender As Object, e As EventArgs) Handles Button1.Click
-        Close()
     End Sub
 
     Private Sub Form1_Paint(sender As Object, e As PaintEventArgs) Handles Me.Paint
@@ -89,6 +64,15 @@ Public Class Form1
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias
         'https://learn.microsoft.com/en-us/dotnet/api/system.drawing.graphics.smoothingmode?view=windowsdesktop-8.0
         ' Makes drawn graphics MUCH cleaner
+
+        If Control.ModifierKeys = Keys.Control Then
+            Close()
+            Return
+        End If
+        ' This might sound weird, but I'm 99% sure that the way I'm painting the form through
+        ' Invalidate makes the keyDown event not work (as the form is too busy painting itself), but there is a way to see what modifier keys are
+        ' pressed at any time, so the Control key is now the close key as I can see if it is pressed in render
+        ' https://stackoverflow.com/questions/50794158/how-can-i-detect-the-pressed-key-in-vb-net
 
         tick()
         ' According to https://stackoverflow.com/questions/57497422/how-to-stop-flickering-when-redrawing-ellipses-in-windows-forms,
@@ -170,9 +154,9 @@ Public Class Form1
                     night = False
                     day += 1
                     dayStart = DateTime.Now
-                    pendingOrders(0) = Math.Round(Rnd() * 3) ' TODO: Scale difficulty
-                    pendingOrders(1) = Math.Round(Rnd() * 2)
-                    pendingOrders(2) = Math.Round(Rnd() * 1)
+                    For Each order In gameObjects.OfType(Of order)
+                        order.reactivate()
+                    Next
                 End If
             Else
                 e.Graphics.FillPath(darkBrush, nextButton)
@@ -220,7 +204,7 @@ Public Class Form1
                     End If
                     Select Case i ' TODO: MOVE LINK (BELOW) TO FIRST INSTANCE OF SELECT CASE
                         Case 0
-                            e.Graphics.DrawImage(My.Resources.RockCauldron, New Rectangle(Width + 17.5 + shopX.getValue(), 20 + 265 * i, 250, 200))
+                            e.Graphics.DrawImage(My.Resources.OrderShop, New Rectangle(Width + 17.5 + shopX.getValue(), 60 + 265 * i, 245, 102))
                         Case 1
                             e.Graphics.DrawImage(My.Resources.Cauldron, New Rectangle(Width + 17.5 + shopX.getValue(), 20 + 265 * i, 250, 200))
                         Case 2
@@ -241,19 +225,19 @@ Public Class Form1
                 shopFormat.Alignment = StringAlignment.Near
                 e.Graphics.FillRectangle(darkBrush, New Rectangle(Width - 510 + shopX.getValue(), 17.5, 500, 300))
                 If selectedItem = 0 Then ' TODO: Tweak prices
-                    e.Graphics.DrawString("Stone Cauldron", shopFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 17.5), shopFormat)
-                    e.Graphics.DrawString("This is a very cool cauldron.", descriptionFont, lightBrush, New Point(Width - 500 + shopX.getValue(), 100), shopFormat)
+                    e.Graphics.DrawString("Order Parchment", shopFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 17.5), shopFormat)
+                    e.Graphics.DrawString("Another slot to hold more orders.", descriptionFont, lightBrush, New Point(Width - 500 + shopX.getValue(), 100), shopFormat)
                     If money.getValue() < 1000 Then e.Graphics.DrawString("You cannot afford this!", descriptionFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 280), shopFormat)
                     If Not mouseLock AndAlso MouseButtons = MouseButtons.Left AndAlso money.getValue() >= 1000 Then
                         shopX.setValue(0)
                         shopOpen = False
                         money.addValue(-1000)
                         resetDrag()
-                        newObjects.AddLast(New editCauldron(MousePosition, My.Resources.RockCauldron, New Point(-125, -100), 0))
+                        newObjects.AddLast(New order(MousePosition, New Point(-125, -15)))
                     End If
                 ElseIf selectedItem = 1 Then
                     e.Graphics.DrawString("Iron Cauldron", shopFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 17.5), shopFormat)
-                    e.Graphics.DrawString("This is a very cool cauldron.", descriptionFont, lightBrush, New Point(Width - 500 + shopX.getValue(), 100), shopFormat)
+                    e.Graphics.DrawString("A basic cauldron.", descriptionFont, lightBrush, New Point(Width - 500 + shopX.getValue(), 100), shopFormat)
                     If money.getValue() < 1000 Then e.Graphics.DrawString("You cannot afford this!", descriptionFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 280), shopFormat)
                     If Not mouseLock AndAlso MouseButtons = MouseButtons.Left AndAlso money.getValue() >= 1000 Then
                         shopX.setValue(0)
@@ -264,7 +248,7 @@ Public Class Form1
                     End If
                 ElseIf selectedItem = 2 Then
                     e.Graphics.DrawString("Copper Cauldron", shopFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 17.5), shopFormat)
-                    e.Graphics.DrawString("This is a very cool cauldron.", descriptionFont, lightBrush, New Point(Width - 500 + shopX.getValue(), 100), shopFormat)
+                    e.Graphics.DrawString("A better, faster cauldron.", descriptionFont, lightBrush, New Point(Width - 500 + shopX.getValue(), 100), shopFormat)
                     If money.getValue() < 1000 Then e.Graphics.DrawString("You cannot afford this!", descriptionFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 280), shopFormat)
                     If Not mouseLock AndAlso MouseButtons = MouseButtons.Left AndAlso money.getValue() >= 1000 Then
                         shopX.setValue(0)
@@ -275,7 +259,7 @@ Public Class Form1
                     End If
                 Else
                     e.Graphics.DrawString("Gold Cauldron", shopFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 17.5), shopFormat)
-                    e.Graphics.DrawString("This is a very cool cauldron.", descriptionFont, lightBrush, New Point(Width - 500 + shopX.getValue(), 100), shopFormat)
+                    e.Graphics.DrawString("Fast. Not for the faint of heart.", descriptionFont, lightBrush, New Point(Width - 500 + shopX.getValue(), 100), shopFormat)
                     If money.getValue() < 1000 Then e.Graphics.DrawString("You cannot afford this!", descriptionFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 280), shopFormat)
                     If Not mouseLock AndAlso MouseButtons = MouseButtons.Left AndAlso money.getValue() >= 1000 Then
                         shopX.setValue(0)
@@ -311,7 +295,7 @@ Public Class Form1
 
         e.Graphics.SetClip(circleClip)
 
-        Dim sun As Rectangle = New Rectangle(43, 43 + getDayTime() / 18000 * 5, 33, 33) ' Days last 3 minutes (180000 milliseconds), moving the sun down 50 pixels
+        Dim sun As Rectangle = New Rectangle(43, 43 + getDayTime() / 6000 * 5, 33, 33) ' Days last 3 minutes (180000 milliseconds), moving the sun down 50 pixels
         Dim sunBrush As SolidBrush = New SolidBrush(Color.FromArgb(240, 201, 61))
         Dim sunPen As Pen = New Pen(Color.FromArgb(223, 177, 58), 5)
         e.Graphics.FillEllipse(sunBrush, sun)
@@ -330,13 +314,14 @@ Public Class Form1
                 shopOpen = False
                 shopX.snapValue(0)
                 dayTransition.setValue(20)
-                pendingOrders = {0, 0, 0}
                 ' TODO: Night mode
                 For Each obj In gameObjects
                     If obj.GetType() = GetType(cauldron) Then ' TODO: Source?
                         ' Replaces cauldrons with a movable version of themselves during the night
                         newObjects.AddLast(New editCauldron(obj))
                         deadObjects.AddLast(obj)
+                    ElseIf obj.GetType() = GetType(order) Then
+                        obj.deactivate()
                     Else
                         obj.kill()
                     End If
@@ -450,6 +435,9 @@ Public Class gameObject ' A basic class to be inherited by the main game objects
     Public Overridable Function getBounds() As Rectangle
         Return New Rectangle(x, y, sprite.Width, sprite.Height)
     End Function
+
+    Public Overridable Sub deactivate() ' Put in here just so that orders can use them without needing to be specifically of the type order
+    End Sub
 
     Public Overridable Sub kill()
         dead = True
@@ -694,7 +682,7 @@ Public Class potion
                 Next
                 Form1.money.addValue(ingredientCount * 20 + bonusValue)
             End If
-            selectedOrder.kill()
+            selectedOrder.deactivate()
             Form1.deadObjects.AddLast(Me)
         End If
     End Sub
@@ -819,16 +807,16 @@ Public Class cauldron
         Select Case type
             Case 0
                 ' Rock
-                totalTime = 60000
+                totalTime = 30000
             Case 1
                 ' Iron
-                totalTime = 45000
+                totalTime = 15000
             Case 2
                 ' Copper
-                totalTime = 30000
+                totalTime = 10000
             Case 3
                 ' Gold
-                totalTime = 15000
+                totalTime = 6000
         End Select
     End Sub
 
@@ -1135,70 +1123,60 @@ Public Class order
     Inherits draggable
 
     Dim timerStart As DateTime
-    Dim duration As Integer = 100000
+    Dim duration As Integer = 30000
+    Dim cooldown As Integer
     Dim orderOpen As Boolean ' Kept independently of potion-hovering effects (which can temporarily open an order)
-    Dim maxHeight As Integer
-    Dim orderHeight As animatedValue = New animatedValue()
-    Dim spawnDX As animatedValue = New animatedValue(100)
-    Dim spawning As Boolean
+    Dim orderHeight As animatedValue = New animatedValue(40)
+    Dim active As Boolean
     Dim orderImg As Bitmap
     Public recipe(0 To 2, 0 To 3) As Integer
     Public potionHover As Boolean
 
     Public Sub New()
-        MyBase.New(0, 30)
-        sprite = My.Resources.PaperRoll
-        orderHeight.snapValue(40)
-        orderHeight.duration = 2
-        orderOpen = False
-        potionHover = False
-        spawning = True
-        Randomize()
-        recipe = {{Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)},
-            {Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)},
-            {Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)}}
-        timerStart = DateTime.Now
-        spawnDX.setValue(-280)
-        createOrderImg()
+        Me.New(0, 30)
     End Sub
 
-    Public Sub New(offset As Integer)
-        MyBase.New(0, 30)
-        sprite = My.Resources.PaperRoll
-        orderHeight.snapValue(40)
-        orderHeight.duration = 2
-        orderOpen = False
-        potionHover = False
-        spawning = True
-        Randomize()
-        recipe = {{Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)},
-            {Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)},
-            {Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)}}
-        timerStart = DateTime.Now
-        spawnDX.setValue(-280 - offset * 300)
-        createOrderImg()
-    End Sub
 
     Public Sub New(x As Integer, y As Integer)
         MyBase.New(x, y)
         sprite = My.Resources.PaperRoll
-        orderHeight.snapValue(40)
-        orderHeight.duration = 2
+        orderHeight.duration = 5
+        reactivate()
+    End Sub
+
+    Public Sub New(position As Point, offset As Point)
+        ' Used only when an new parchment is bought at night
+        MyBase.New(position.X, position.Y)
+        sprite = My.Resources.PaperRoll
+        grabbed = True
+        Form1.grabLock = True
+        grabOffset = offset
         orderOpen = False
         potionHover = False
-        spawning = False
+        active = False
+        orderHeight.duration = 5
+        orderHeight.snapValue(0)
+        orderImg = New Bitmap(219, 268) ' Just sets it as a blank bitmap so that rendering doesn't throw issues (will be updated when the day starts)
+    End Sub
+
+    Public Sub reactivate()
+        orderOpen = True
+        potionHover = False
+        active = True
         Randomize()
         recipe = {{Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)},
             {Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)},
             {Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)}}
         timerStart = DateTime.Now
         createOrderImg()
+        orderHeight.setValue(275)
     End Sub
 
-    Public Overrides Sub kill()
-        MyBase.kill()
-        orderHeight.duration = 5
+    Public Overrides Sub deactivate()
+        active = False
         orderHeight.setValue(0)
+        cooldown = getTimer()
+        timerStart = DateTime.Now
     End Sub
 
     Public Function getPaperRect() As Rectangle
@@ -1246,17 +1224,10 @@ Public Class order
 
     Public Overrides Sub tick()
         MyBase.tick()
-        If dead Then Return
-        If spawning Then
-            spawnDX.updateValue()
-            x = Form1.Width + spawnDX.getValue() ' Slides in from the right edge
-            If spawnDX.done Then spawning = False
-            Return
-        End If
+        If Not active Then Return
         If Not grabbed AndAlso Not Form1.mouseLock AndAlso
             New Rectangle(x, y + orderHeight.getValue(), sprite.Width, sprite.Height).Contains(Form1.MousePosition) And
             Form1.MouseButtons = MouseButtons.Left Then
-
             orderOpen = Not orderOpen
         End If
         If potionHover Or orderOpen Then
@@ -1284,11 +1255,23 @@ Public Class order
 
         MyBase.render(g)
 
+        If Form1.night Then Return
+
         Dim timerBrush As SolidBrush = New SolidBrush(Color.FromArgb(148, 72, 208))
 
-        Form1.cleanArc(g, timerBrush, x + sprite.Width / 2, y + 8 + sprite.Height / 2, 33, 21, 180, Math.Min(getTimer() / duration * 180, 180))
+        If active Then
+            Form1.cleanArc(g, timerBrush, x + sprite.Width / 2, y + 8 + sprite.Height / 2, 33, 21, 180, Math.Min(getTimer() / duration * 180, 180))
 
-        If getTimer() - 3000 > duration Then kill()
+            If getTimer() - 3000 > duration Then deactivate()
+        Else
+            Form1.cleanArc(g, timerBrush, x + sprite.Width / 2, y + 8 + sprite.Height / 2, 33, 21, 180, Math.Max((cooldown - getTimer()) / duration * 180, 0))
+
+            If cooldown - getTimer() < -10 Then
+                ' TODO: Reset order
+                reactivate()
+            End If
+        End If
+
 
         timerBrush.Dispose()
 

@@ -216,5 +216,8 @@
   <ItemGroup>
     <None Include="Resources\TrashOpen.png" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\OrderShop.png" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
 </Project>

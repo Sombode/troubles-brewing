@@ -166,6 +166,9 @@
   <data name="OrderBackground" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\OrderBackground.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
+  <data name="OrderShop" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\OrderShop.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
   <data name="PaperRoll" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\PaperRoll.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
