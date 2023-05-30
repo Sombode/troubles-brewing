@@ -18,7 +18,7 @@ Public Class Form1
     Public newObjects, deadObjects As LinkedList(Of gameObject) ' Lists that will be used to modify gameObjects after iteration (as the direct list cannot be modified during iteration)
     Public mouseLock, grabLock, night As Boolean
     Public day As Integer
-    Public money As animatedValue = New animatedValue(5000)
+    Public money As animatedValue = New animatedValue(500000)
     Public dayTransition As animatedValue = New animatedValue(0)
     Dim shopX As animatedValue = New animatedValue(0)
     Dim shopOpen As Boolean
@@ -51,7 +51,6 @@ Public Class Form1
         night = False
         dayStart = DateTime.Now
         pendingOrders(0) = Math.Round(Rnd() * 3)
-        pendingOrders(0) = 5
         pendingOrders(1) = Math.Round(Rnd() * 2)
         pendingOrders(2) = Math.Round(Rnd() * 1)
     End Sub
@@ -114,6 +113,10 @@ Public Class Form1
             potion.render(e.Graphics)
         Next
 
+        For Each cauldron In gameObjects.OfType(Of cauldron).Reverse() ' Reversing these lists when rendering for 2 key reasons:
+            cauldron.renderUI(e.Graphics)
+        Next
+
         ' Removing no longer needed objects post loop
 
         For Each deadObj In deadObjects
@@ -167,6 +170,9 @@ Public Class Form1
                     night = False
                     day += 1
                     dayStart = DateTime.Now
+                    pendingOrders(0) = Math.Round(Rnd() * 3) ' TODO: Scale difficulty
+                    pendingOrders(1) = Math.Round(Rnd() * 2)
+                    pendingOrders(2) = Math.Round(Rnd() * 1)
                 End If
             Else
                 e.Graphics.FillPath(darkBrush, nextButton)
@@ -319,11 +325,12 @@ Public Class Form1
             e.Graphics.FillPath(nightBrush, circleClip)
             e.Graphics.DrawImage(moon, New Rectangle(43, 93 - 50 * dayTransition.getValue() / 20, 33, 33))
         Else
-            If getDayTime() > 180000 Then
+            If getDayTime() > 1000 Then
                 night = True
                 shopOpen = False
                 shopX.snapValue(0)
                 dayTransition.setValue(20)
+                pendingOrders = {0, 0, 0}
                 ' TODO: Night mode
                 For Each obj In gameObjects
                     If obj.GetType() = GetType(cauldron) Then ' TODO: Source?
@@ -512,7 +519,7 @@ Public Class draggable ' A class based off of gameObject with additional functio
         End If
     End Sub
 
-    Overridable Sub onGrab() ' Essentially event handlers for grabbing and releasing
+    Overridable Sub onGrab() ' Event handlers for grabbing and releasing
     End Sub
 
     Overridable Sub onRelease()
@@ -787,8 +794,8 @@ Public Class cauldron
 
     Public Sub New(base As editCauldron)
         Me.New()
-        Me.x = x
-        Me.y = y
+        Me.x = base.x
+        Me.y = base.y
         Me.sprite = base.sprite
         Me.type = base.type
         setupStats()
@@ -869,10 +876,8 @@ Public Class cauldron
     Public Overrides Sub render(g As Graphics)
 
         ' Constants used for rendering
-        Dim darkBrush As SolidBrush = New SolidBrush(Color.FromArgb(200, 10, 10, 10))
-        Dim lightBrush As SolidBrush = New SolidBrush(Color.FromArgb(200, 200, 200, 200))
-        Dim centerX As Integer = x + CInt(getBounds().Width / 2)
-        Dim centerY As Integer = y + CInt(getBounds().Height / 2)
+        Dim centerX As Integer = x + CInt(sprite.Width / 2)
+        Dim centerY As Integer = y + CInt(sprite.Height / 2)
 
         g.DrawString(brewStage, Form1.debugFont, Brushes.Black, New Point(x, y - 100))
 
@@ -897,7 +902,15 @@ Public Class cauldron
         Next
 
         MyBase.render(g)
+    End Sub
 
+    Public Sub renderUI(g As Graphics)
+        ' Render UI after all cauldrons are rendered so that they are always visible
+
+        Dim centerX As Integer = x + CInt(sprite.Width / 2)
+        Dim centerY As Integer = y + CInt(sprite.Height / 2)
+        Dim darkBrush As SolidBrush = New SolidBrush(Color.FromArgb(200, 10, 10, 10))
+        Dim lightBrush As SolidBrush = New SolidBrush(Color.FromArgb(200, 200, 200, 200))
         ' Rendering the brew stage dial
         If Not brewStage = -1 Then
             Dim dial = My.Resources.BrewDial
