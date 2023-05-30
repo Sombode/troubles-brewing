@@ -225,5 +225,17 @@
   <ItemGroup>
     <None Include="Resources\PlayButton.png" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\Game Over.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\ExitButton.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\ReplayButton.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\Warning.png" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
 </Project>

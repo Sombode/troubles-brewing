@@ -18,7 +18,8 @@ Public Class Form1
     Public newObjects, deadObjects As LinkedList(Of gameObject) ' Lists that will be used to modify gameObjects after iteration (as the direct list cannot be modified during iteration)
     Public mouseLock, grabLock, night As Boolean
     Public day As Integer
-    Public money As animatedValue = New animatedValue(1000)
+    Public gameOver As Boolean
+    Public money As animatedValue = New animatedValue(100)
     Public dayTransition As animatedValue = New animatedValue(0)
     Dim shopX As animatedValue = New animatedValue(0)
     Dim shopOpen, titleOpen As Boolean
@@ -41,6 +42,7 @@ Public Class Form1
         deadObjects = New LinkedList(Of gameObject)
         mouseLock = False
         grabLock = False
+        gameOver = False
         'gameObjects.AddFirst(New order(800, 300))
         'gameObjects.AddFirst(New order(900, 500))
         'gameObjects.AddFirst(New order(1000, 700))
@@ -60,6 +62,25 @@ Public Class Form1
         Next
     End Sub
 
+    Public Sub gameEnd(g As Graphics)
+        ' Game Over Screen
+        If mouseLock AndAlso (MouseButtons = MouseButtons.None) Then mouseLock = False
+        Dim menuFont As Font = New Font(pfc.Families(0), 50)
+        g.DrawImage(My.Resources.GameOver, New Rectangle(Width / 2 - 285.5, 100, 571, 96))
+        Dim restartButton As Rectangle = New Rectangle(Width / 2 - 158.5, 650, 317, 86)
+        Dim exitButton As Rectangle = New Rectangle(Width / 2 - 158.5, 750, 317, 86)
+        g.DrawImage(My.Resources.ReplayButton, restartButton)
+        g.DrawImage(My.Resources.ExitButton, exitButton)
+        If Not mouseLock AndAlso MouseButtons = MouseButtons.Left Then
+            If restartButton.Contains(MousePosition) Then
+                Application.Restart()
+            ElseIf exitButton.Contains(MousePosition) Then
+                Close()
+            End If
+        End If
+        ' TODO: Calc Score
+    End Sub
+
     Private Sub Form1_Paint(sender As Object, e As PaintEventArgs) Handles Me.Paint
 
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias
@@ -70,6 +91,17 @@ Public Class Form1
             Close()
             Return
         End If
+        If Control.ModifierKeys = Keys.Alt Then
+            gameOver = True
+        End If
+
+        If gameOver Then
+            gameEnd(e.Graphics)
+            If (MouseButtons = MouseButtons.Left) Then mouseLock = True
+            Invalidate()
+            Return
+        End If
+
         ' This might sound weird, but I'm 99% sure that the way I'm painting the form through
         ' Invalidate makes the keyDown event not work (as the form is too busy painting itself), but there is a way to see what modifier keys are
         ' pressed at any time, so the Control key is now the close key as I can see if it is pressed in render
@@ -147,6 +179,8 @@ Public Class Form1
             e.Graphics.DrawImage(coin, New Rectangle(5, Height - coin.Height - 5, coin.Width, coin.Height))
             outlineText(e.Graphics, FormatCurrency(money.getValue(), 0), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(90, Height - 50), StringAlignment.Near)
 
+            If money.getValue() < 100 Then e.Graphics.DrawImage(My.Resources.Warning, New Rectangle(60, Height - 50, 40, 40))
+
             dayTransition.updateValue()
 
             If night Or Not dayTransition.done Then
@@ -165,22 +199,28 @@ Public Class Form1
                     e.Graphics.FillPath(dimBrush, nextButton)
                     If Not mouseLock AndAlso MouseButtons = MouseButtons.Left Then
                         ' Return to day
-                        For Each cauldron In gameObjects.OfType(Of editCauldron)
-                            cauldron.transmute()
-                        Next
-                        dayTransition.setValue(0)
-                        night = False
-                        day += 1
-                        dayStart = DateTime.Now
-                        For Each order In gameObjects.OfType(Of order)
-                            order.reactivate()
-                        Next
+                        If money.getValue() < 100 Then
+                            gameOver = True ' End game due to bankruptcy
+                        Else
+                            For Each cauldron In gameObjects.OfType(Of editCauldron)
+                                cauldron.transmute()
+                            Next
+                            dayTransition.setValue(0)
+                            night = False
+                            day += 1
+                            dayStart = DateTime.Now
+                            For Each order In gameObjects.OfType(Of order)
+                                order.reactivate()
+                            Next
+                        End If
                     End If
                 Else
                     e.Graphics.FillPath(darkBrush, nextButton)
                 End If
 
                 e.Graphics.DrawImage(My.Resources.NextIcon, New Rectangle(27, 27 + 4.5 * dayTransition.getValue(), 66, 65))
+
+                If money.getValue() < 100 Then e.Graphics.DrawImage(My.Resources.Warning, New Rectangle(60, 60 + 4.5 * dayTransition.getValue(), 40, 40))
 
                 ' Shop UI
 
@@ -214,6 +254,7 @@ Public Class Form1
                 If shopOpen Or Not shopX.done Then
                     For i = 0 To 3
                         Dim button As Rectangle = New Rectangle(Width + 5 + shopX.getValue(), 17.5 + 265 * i, 275, 250)
+                        Dim price As Integer
                         If button.Contains(MousePosition) Then
                             e.Graphics.FillRectangle(dimBrush, button)
                             selectedItem = i
@@ -223,16 +264,20 @@ Public Class Form1
                         Select Case i ' TODO: MOVE LINK (BELOW) TO FIRST INSTANCE OF SELECT CASE
                             Case 0
                                 e.Graphics.DrawImage(My.Resources.OrderShop, New Rectangle(Width + 17.5 + shopX.getValue(), 60 + 265 * i, 245, 102))
+                                price = 50 * (2 ^ gameObjects.OfType(Of order).Count()) ' Prices of parchment scales exponentially, as it becomes better and better to handle more orders
                             Case 1
                                 e.Graphics.DrawImage(My.Resources.Cauldron, New Rectangle(Width + 17.5 + shopX.getValue(), 20 + 265 * i, 250, 200))
+                                price = 1000
                             Case 2
                                 e.Graphics.DrawImage(My.Resources.CopperCauldron, New Rectangle(Width + 17.5 + shopX.getValue(), 20 + 265 * i, 250, 200))
+                                price = 2500
                             Case 3
                                 e.Graphics.DrawImage(My.Resources.GoldCauldron, New Rectangle(Width + 17.5 + shopX.getValue(), 20 + 265 * i, 250, 200))
+                                price = 5000
                         End Select
                         'e.Graphics.DrawImage({My.Resources.RockCauldron, My.Resources.Cauldron, My.Resources.CopperCauldron, My.Resources.GoldCauldron}(i),
                         '                     New Rectangle(Width + 17.5 + shopX.getValue(), 20 + 265 * i, 250, 200))
-                        e.Graphics.DrawString("$1000", shopFont, lightBrush, New Point(Width + 145 + shopX.getValue(), 210 + 265 * i), shopFormat)
+                        e.Graphics.DrawString(FormatCurrency(price, 0), shopFont, lightBrush, New Point(Width + 145 + shopX.getValue(), 210 + 265 * i), shopFormat)
                     Next
                 Else
                     e.Graphics.FillRectangle(lightBrush, New Rectangle(Width + 20 + shopX.getValue() + (dayTransition.getValue() * -3), Height / 2 - 20, 10, 40))
@@ -242,51 +287,43 @@ Public Class Form1
                     Dim descriptionFont As Font = New Font(pfc.Families(0), 24)
                     shopFormat.Alignment = StringAlignment.Near
                     e.Graphics.FillRectangle(darkBrush, New Rectangle(Width - 510 + shopX.getValue(), 17.5, 500, 300))
-                    If selectedItem = 0 Then ' TODO: Tweak prices
-                        e.Graphics.DrawString("Order Parchment", shopFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 17.5), shopFormat)
-                        e.Graphics.DrawString("Another slot to hold more orders.", descriptionFont, lightBrush, New Point(Width - 500 + shopX.getValue(), 100), shopFormat)
-                        If money.getValue() < 1000 Then e.Graphics.DrawString("You cannot afford this!", descriptionFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 280), shopFormat)
-                        If Not mouseLock AndAlso MouseButtons = MouseButtons.Left AndAlso money.getValue() >= 1000 Then
-                            shopX.setValue(0)
-                            shopOpen = False
-                            money.addValue(-1000)
-                            resetDrag()
-                            newObjects.AddLast(New order(MousePosition, New Point(-125, -15)))
-                        End If
-                    ElseIf selectedItem = 1 Then
-                        e.Graphics.DrawString("Iron Cauldron", shopFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 17.5), shopFormat)
-                        e.Graphics.DrawString("A basic cauldron.", descriptionFont, lightBrush, New Point(Width - 500 + shopX.getValue(), 100), shopFormat)
-                        If money.getValue() < 1000 Then e.Graphics.DrawString("You cannot afford this!", descriptionFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 280), shopFormat)
-                        If Not mouseLock AndAlso MouseButtons = MouseButtons.Left AndAlso money.getValue() >= 1000 Then
-                            shopX.setValue(0)
-                            shopOpen = False
-                            money.addValue(-1000)
-                            resetDrag()
-                            newObjects.AddLast(New editCauldron(MousePosition, My.Resources.Cauldron, New Point(-125, -100), 1))
-                        End If
-                    ElseIf selectedItem = 2 Then
-                        e.Graphics.DrawString("Copper Cauldron", shopFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 17.5), shopFormat)
-                        e.Graphics.DrawString("A better, faster cauldron.", descriptionFont, lightBrush, New Point(Width - 500 + shopX.getValue(), 100), shopFormat)
-                        If money.getValue() < 1000 Then e.Graphics.DrawString("You cannot afford this!", descriptionFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 280), shopFormat)
-                        If Not mouseLock AndAlso MouseButtons = MouseButtons.Left AndAlso money.getValue() >= 1000 Then
-                            shopX.setValue(0)
-                            shopOpen = False
-                            money.addValue(-1000)
-                            resetDrag()
-                            newObjects.AddLast(New editCauldron(MousePosition, My.Resources.CopperCauldron, New Point(-125, -100), 2))
-                        End If
-                    Else
-                        e.Graphics.DrawString("Gold Cauldron", shopFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 17.5), shopFormat)
-                        e.Graphics.DrawString("Fast. Not for the faint of heart.", descriptionFont, lightBrush, New Point(Width - 500 + shopX.getValue(), 100), shopFormat)
-                        If money.getValue() < 1000 Then e.Graphics.DrawString("You cannot afford this!", descriptionFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 280), shopFormat)
-                        If Not mouseLock AndAlso MouseButtons = MouseButtons.Left AndAlso money.getValue() >= 1000 Then
-                            shopX.setValue(0)
-                            shopOpen = False
-                            money.addValue(-1000)
-                            resetDrag()
-                            newObjects.AddLast(New editCauldron(MousePosition, My.Resources.GoldCauldron, New Point(-125, -100), 3))
-                        End If
+                    Dim price As Integer
+                    Select Case selectedItem
+                        Case 0
+                            e.Graphics.DrawString("Order Parchment", shopFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 17.5), shopFormat)
+                            e.Graphics.DrawString("Another slot to hold more orders.", descriptionFont, lightBrush, New Point(Width - 500 + shopX.getValue(), 100), shopFormat)
+                            price = 50 * (2 ^ gameObjects.OfType(Of order).Count())
+                        Case 1
+                            e.Graphics.DrawString("Iron Cauldron", shopFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 17.5), shopFormat)
+                            e.Graphics.DrawString("A basic cauldron. Tried and true.", descriptionFont, lightBrush, New Point(Width - 500 + shopX.getValue(), 100), shopFormat)
+                            price = 1000
+                        Case 2
+                            e.Graphics.DrawString("Copper Cauldron", shopFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 17.5), shopFormat)
+                            e.Graphics.DrawString("A better, faster cauldron.", descriptionFont, lightBrush, New Point(Width - 500 + shopX.getValue(), 100), shopFormat)
+                            price = 2500
+                        Case 3
+                            e.Graphics.DrawString("Gold Cauldron", shopFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 17.5), shopFormat)
+                            e.Graphics.DrawString("Fast. Not for the faint of heart.", descriptionFont, lightBrush, New Point(Width - 500 + shopX.getValue(), 100), shopFormat)
+                            price = 5000
+                    End Select
+                    If money.getValue() < price Then e.Graphics.DrawString("You cannot afford this!", descriptionFont, lightBrush, New Point(Width - 510 + shopX.getValue(), 280), shopFormat)
+                    If Not mouseLock AndAlso MouseButtons = MouseButtons.Left AndAlso money.getValue() >= price Then
+                        shopX.setValue(0)
+                        shopOpen = False
+                        money.addValue(-price)
+                        resetDrag()
+                        Select Case selectedItem
+                            Case 0
+                                newObjects.AddLast(New order(MousePosition, New Point(-125, -15)))
+                            Case 1
+                                newObjects.AddLast(New editCauldron(MousePosition, My.Resources.Cauldron, New Point(-125, -100), 3))
+                            Case 2
+                                newObjects.AddLast(New editCauldron(MousePosition, My.Resources.CopperCauldron, New Point(-125, -100), 3))
+                            Case 3
+                                newObjects.AddLast(New editCauldron(MousePosition, My.Resources.GoldCauldron, New Point(-125, -100), 3))
+                        End Select
                     End If
+
                 End If
 
                 darkBrush.Dispose()
@@ -313,7 +350,7 @@ Public Class Form1
 
             e.Graphics.SetClip(circleClip)
 
-            Dim sun As Rectangle = New Rectangle(43, 43 + getDayTime() / 6000 * 5, 33, 33) ' Days last 3 minutes (180000 milliseconds), moving the sun down 50 pixels
+            Dim sun As Rectangle = New Rectangle(43, 43 + getDayTime() / 6000 * 5, 33, 33) ' Days last 1 minute (60000 milliseconds), moving the sun down 50 pixels
             Dim sunBrush As SolidBrush = New SolidBrush(Color.FromArgb(240, 201, 61))
             Dim sunPen As Pen = New Pen(Color.FromArgb(223, 177, 58), 5)
             e.Graphics.FillEllipse(sunBrush, sun)
@@ -327,7 +364,7 @@ Public Class Form1
                 e.Graphics.FillPath(nightBrush, circleClip)
                 e.Graphics.DrawImage(moon, New Rectangle(43, 93 - 50 * dayTransition.getValue() / 20, 33, 33))
             Else
-                If getDayTime() > 60000 Then
+                If getDayTime() > 60000 Or Control.ModifierKeys = Keys.Shift Then
                     night = True
                     shopOpen = False
                     shopX.snapValue(0)
@@ -827,13 +864,13 @@ Public Class cauldron
         Select Case type
             Case 1
                 ' Iron
-                totalTime = 15000
+                totalTime = 30000
             Case 2
                 ' Copper
-                totalTime = 10000
+                totalTime = 20000
             Case 3
                 ' Gold
-                totalTime = 6000
+                totalTime = 10000
         End Select
     End Sub
 
@@ -1139,7 +1176,7 @@ Public Class order
     Inherits draggable
 
     Dim timerStart As DateTime
-    Dim duration As Integer = 30000
+    Dim duration As Integer = 45000
     Dim cooldown As Integer
     Dim orderOpen As Boolean ' Kept independently of potion-hovering effects (which can temporarily open an order)
     Dim orderHeight As animatedValue = New animatedValue(40)
@@ -1173,16 +1210,24 @@ Public Class order
         orderHeight.duration = 5
         orderHeight.snapValue(0)
         orderImg = New Bitmap(219, 268) ' Just sets it as a blank bitmap so that rendering doesn't throw issues (will be updated when the day starts)
+
+        Randomize()
     End Sub
 
     Public Sub reactivate()
         orderOpen = True
         potionHover = False
         active = True
-        Randomize()
-        recipe = {{Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)},
-            {Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)},
-            {Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3), Int(Rnd() * 3)}}
+        Dim largeOrder As Boolean = (Form1.day > 5 AndAlso Int(Rnd() * 4) = 0) ' Day 5 and onward, orders can spawn with copius amounts of ingredients
+        recipe = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}
+        recipe(0, Int(Rnd() * 4)) += 1 ' Ensure that there is at least one ingredient in the green stage of brewing (as brewing must start in green)
+        For stage = 0 To 2
+            For ingredient = 0 To 3
+                recipe(stage, ingredient) += Int(Rnd() * 2)
+                If largeOrder Then recipe(stage, ingredient) += Int(Rnd() * 4)
+            Next
+        Next
+
         timerStart = DateTime.Now
         createOrderImg()
         orderHeight.setValue(275)
@@ -1241,9 +1286,8 @@ Public Class order
     Public Overrides Sub tick()
         MyBase.tick()
         If Not active Then Return
-        If Not grabbed AndAlso Not Form1.mouseLock AndAlso
-            New Rectangle(x, y + orderHeight.getValue(), sprite.Width, sprite.Height).Contains(Form1.MousePosition) And
-            Form1.MouseButtons = MouseButtons.Left Then
+        If Not grabbed AndAlso Not Form1.mouseLock AndAlso Form1.MouseButtons = MouseButtons.Left AndAlso
+            New Rectangle(x, y + orderHeight.getValue(), sprite.Width, sprite.Height).Contains(Form1.MousePosition) Then
             orderOpen = Not orderOpen
         End If
         If potionHover Or orderOpen Then
@@ -1257,17 +1301,21 @@ Public Class order
 
         orderHeight.updateValue()
 
-        g.FillRectangle(New SolidBrush(Color.FromArgb(201, 162, 103)), getPaperRect())
+        If active Or Not orderHeight.done Then
+            g.FillRectangle(New SolidBrush(Color.FromArgb(201, 162, 103)), getPaperRect())
 
-        g.SetClip(getPaperRect())
+            If orderHeight.getValue() > 50 Then
+                g.SetClip(getPaperRect())
 
-        g.DrawImage(orderImg, New Rectangle(x + 3, y + 19, 219, 268))
+                g.DrawImage(orderImg, New Rectangle(x + 3, y + 19, 219, 268))
 
-        g.ResetClip()
+                g.ResetClip()
+            End If
 
-        Dim bottomRoll As Image = My.Resources.RollUp
-        If Not (orderOpen Or potionHover) Then bottomRoll = My.Resources.RollDown
-        g.DrawImage(bottomRoll, New Rectangle(x, y + orderHeight.getValue(), sprite.Width, sprite.Height))
+            Dim bottomRoll As Image = My.Resources.RollUp
+            If Not (orderOpen Or potionHover) Then bottomRoll = My.Resources.RollDown
+            g.DrawImage(bottomRoll, New Rectangle(x, y + orderHeight.getValue(), sprite.Width, sprite.Height))
+        End If
 
         MyBase.render(g)
 
@@ -1280,9 +1328,9 @@ Public Class order
 
             If getTimer() - 3000 > duration Then deactivate()
         Else
-            Form1.cleanArc(g, timerBrush, x + sprite.Width / 2, y + 8 + sprite.Height / 2, 33, 21, 180, Math.Max((cooldown - getTimer()) / duration * 180, 0))
+            Form1.cleanArc(g, timerBrush, x + sprite.Width / 2, y + 8 + sprite.Height / 2, 33, 21, 180, Math.Max((cooldown - getTimer() * 2) / duration * 180, 0))
 
-            If cooldown - getTimer() < -10 Then
+            If cooldown - getTimer() * 2 < -10 Then
                 ' TODO: Reset order
                 reactivate()
             End If
