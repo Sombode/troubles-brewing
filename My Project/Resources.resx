@@ -121,11 +121,35 @@
   <data name="Background" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\Background.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
+  <data name="bottle" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\bottle.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
   <data name="BrewDial" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\BrewDial.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
   <data name="BrewDialArrow" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\BrewDialArrow.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="brewStage" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\brewStage.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="bubble1" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\bubble1.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="bubble2" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\bubble2.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="bubble3" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\bubble3.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="bubble4" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\bubble4.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="bubble5" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\bubble5.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="buy" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\buy.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
   <data name="CancelIcon" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\CancelIcon.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
@@ -151,6 +175,9 @@
   <data name="Eye" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\Eye.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
+  <data name="fail" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\fail.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
   <data name="GameOver" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\Game Over.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
@@ -159,6 +186,9 @@
   </data>
   <data name="Herb" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\Herb.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="money" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\money.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
   <data name="Moon" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\Moon.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
@@ -169,11 +199,17 @@
   <data name="NextIcon" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\NextIcon.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
+  <data name="night" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\night.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
   <data name="OrderBackground" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\OrderBackground.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
   <data name="OrderShop" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\OrderShop.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="orderUp" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\orderUp.wav;System.IO.MemoryStream, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
   <data name="PaperRoll" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\PaperRoll.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>

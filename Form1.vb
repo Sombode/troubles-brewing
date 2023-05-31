@@ -15,7 +15,8 @@ Imports System.Runtime.InteropServices.ComTypes
 Public Class Form1
 
     Public gameObjects As LinkedList(Of gameObject) ' The main list of game objects (to loop through and tick/render them)
-    Public newObjects, deadObjects As LinkedList(Of gameObject) ' Lists that will be used to modify gameObjects after iteration (as the direct list cannot be modified during iteration)
+    Public newObjects, deadObjects As LinkedList(Of gameObject) ' Lists that will be used to modify gameObjects after iteration
+    ' (as the direct list cannot be modified during iteration)
     Public mouseLock, grabLock, night As Boolean
     Public day As Integer
     Public ordersDone As Integer ' Secretly kept for scoring
@@ -28,13 +29,8 @@ Public Class Form1
     Dim shopOpen, titleOpen As Boolean
     Dim dayStart As DateTime
 
-    Dim lastTick As DateTime ' DEBUG REMOVE THIS
-
-    ' TODO: Do something about right clicks?
-    ' TODO: (Polish) rolling list of transactions (class); moves up and fades out
-
-    Public pfc As PrivateFontCollection = New PrivateFontCollection() ' PFC and custom font code derived from: https://stackoverflow.com/questions/13573916/using-custom-fonts-in-my-winform-labels
-    Public debugFont As Font ' TODO: Remove
+    Public pfc As PrivateFontCollection = New PrivateFontCollection() ' PFC and custom font code derived from:
+    ' https://stackoverflow.com/questions/13573916/using-custom-fonts-in-my-winform-labels
 
     Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         pfc.AddFontFile(Application.StartupPath.Replace("bin\Debug", "Resources\GermaniaOne-Regular.ttf")) ' An objectively bad way to import a custom font,
@@ -48,26 +44,20 @@ Public Class Form1
         gameOver = False
         night = False
         titleOpen = True
-        'gameObjects.AddFirst(New order(800, 300))
-        'gameObjects.AddFirst(New order(900, 500))
-        'gameObjects.AddFirst(New order(1000, 700))
-        'gameObjects.AddFirst(New order(800, 300))
-        'gameObjects.AddFirst(New cauldron(500, 500))
-        debugFont = New Font(pfc.Families(0), 14)
         ordersDone = 0
-        day = 12 ' TODO: DEBUG
-        dayStart = DateTime.Now
+        day = 1
     End Sub
 
     Private Sub tick()
+        ' Tick simply runs before render, allowing objects to all update before they are rendered (not really used to its fullest extent in this game)
         If mouseLock AndAlso (MouseButtons = MouseButtons.None) Then mouseLock = False
-        For Each gameObj In gameObjects ' idea: combine tick and render into one loop? depends on interactions, would reduce iterations with more objects
+        For Each gameObj In gameObjects
             gameObj.tick()
         Next
     End Sub
 
     Public Sub gameEnd(g As Graphics)
-        ' Game Over Screen
+        ' Game over screen
         If mouseLock AndAlso (MouseButtons = MouseButtons.None) Then mouseLock = False
         Dim menuFont As Font = New Font(pfc.Families(0), 50)
         Dim outline As Pen = New Pen(Color.Black, 5)
@@ -100,18 +90,18 @@ Public Class Form1
             End Select
         Next
         For i = 1 To gameObjects.OfType(Of order).Count()
-            assetsValue += 50 * (2 ^ (i - 1))
+            assetsValue += 50 * (2 ^ (i - 1)) ' Summing the exponentially growing price for parchment
         Next
         money.snap()
         outlineText(g, "Balance", pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 - 50, 230), StringAlignment.Far)
-        outlineText(g, Str(money.getValue()).Trim(), pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 + 50, 230), StringAlignment.Near) ' TODO: MONEY CAN BE CAUGHT IN THE MIDDLE OF TRANSITION
+        outlineText(g, Str(money.getValue()).Trim(), pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 + 50, 230), StringAlignment.Near)
         outlineText(g, "Liquidated Assets", pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 - 50, 270), StringAlignment.Far)
         outlineText(g, Str(assetsValue).Trim(), pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 + 50, 270), StringAlignment.Near)
-        outlineText(g, "Orders Completed (" + Str(ordersDone).Trim() + ")", pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 - 50, 310), StringAlignment.Far)
+        outlineText(g, "Orders Completed (" + Str(ordersDone).Trim() + ")", pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 - 50, 310),
+                    StringAlignment.Far)
         outlineText(g, Str(orderBonus).Trim(), pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 + 50, 310), StringAlignment.Near)
         outlineText(g, "Days Passed (" + Str(day).Trim() + ")", pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 - 50, 350), StringAlignment.Far)
         outlineText(g, Str(dayBonus).Trim(), pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 + 50, 350), StringAlignment.Near)
-
         If score = -1 Then ' Generates score only if it wasn't already set (as this sub renders each tick)
             score = money.getValue() + assetsValue + orderBonus + dayBonus
             ' High score system
@@ -135,12 +125,10 @@ Public Class Form1
                 outlineText(g, "Couldn't load high scores.", pfc.Families(0), 30, Brushes.Red, outline, New Point(20, Height - 30), StringAlignment.Near)
             End Try
         End If
-
-            outlineText(g, "Total Score", pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 - 50, 500), StringAlignment.Far)
+        outlineText(g, "Total Score", pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 - 50, 500), StringAlignment.Far)
         outlineText(g, Str(score).Trim(), pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 + 50, 500), StringAlignment.Near)
         outlineText(g, "High Score", pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 - 50, 540), StringAlignment.Far)
         outlineText(g, Str(highScore).Trim(), pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 + 50, 540), StringAlignment.Near)
-
         outline.Dispose()
         ' Replay/Exit Buttons
         g.DrawImage(My.Resources.ReplayButton, restartButton)
@@ -155,7 +143,8 @@ Public Class Form1
     End Sub
 
     Private Sub Form1_Paint(sender As Object, e As PaintEventArgs) Handles Me.Paint
-
+        ' According to https://stackoverflow.com/questions/57497422/how-to-stop-flickering-when-redrawing-ellipses-in-windows-forms,
+        ' it is faster to use the Graphics from the PaintEventArgs of the Paint event rather than CreateGraphics(), which removes any flickering when redrawing
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias
         'https://learn.microsoft.com/en-us/dotnet/api/system.drawing.graphics.smoothingmode?view=windowsdesktop-8.0
         ' Makes drawn graphics MUCH cleaner
@@ -164,26 +153,19 @@ Public Class Form1
             Close()
             Return
         End If
-        If Control.ModifierKeys = Keys.Alt Then
-            gameOver = True
-        End If
-
-        If gameOver Then
-            gameEnd(e.Graphics)
-            If (MouseButtons = MouseButtons.Left) Then mouseLock = True
-            Invalidate()
-            Return
-        End If
-
         ' This might sound weird, but I'm 99% sure that the way I'm painting the form through
         ' Invalidate makes the keyDown event not work (as the form is too busy painting itself), but there is a way to see what modifier keys are
         ' pressed at any time, so the Control key is now the close key as I can see if it is pressed in render
         ' https://stackoverflow.com/questions/50794158/how-can-i-detect-the-pressed-key-in-vb-net
 
-        tick()
+        If gameOver Then
+            gameEnd(e.Graphics)
+            If (MouseButtons = MouseButtons.Left) Then mouseLock = True
+            Invalidate() ' You will see the importance of this at the bottom of the sub
+            Return
+        End If
 
-        ' According to https://stackoverflow.com/questions/57497422/how-to-stop-flickering-when-redrawing-ellipses-in-windows-forms,
-        ' it is faster to use the Graphics from the PaintEventArgs of the Paint event rather than CreateGraphics(), which removes any flickering when redrawing
+        tick()
 
         If titleOpen Then
             ' Title Screen
@@ -216,11 +198,11 @@ Public Class Form1
                 order.render(e.Graphics)
             Next
 
-            For Each potion In gameObjects.OfType(Of potion).Reverse() ' 2 - moveToFront() adds to the front (an easy change to fix but it works with reason 1 so I'm keeping it like this)
+            For Each potion In gameObjects.OfType(Of potion).Reverse() ' 2 - moveToFront() adds to the front (an easy change to fix but I'm keeping it like this)
                 potion.render(e.Graphics)
             Next
 
-            For Each cauldron In gameObjects.OfType(Of cauldron).Reverse() ' Reversing these lists when rendering for 2 key reasons:
+            For Each cauldron In gameObjects.OfType(Of cauldron).Reverse()
                 cauldron.renderUI(e.Graphics)
             Next
 
@@ -250,7 +232,8 @@ Public Class Form1
             money.updateValue()
 
             e.Graphics.DrawImage(coin, New Rectangle(5, Height - coin.Height - 5, coin.Width, coin.Height))
-            outlineText(e.Graphics, FormatCurrency(money.getValue(), 0), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(90, Height - 50), StringAlignment.Near)
+            outlineText(e.Graphics, FormatCurrency(money.getValue(), 0), pfc.Families(0), 50, New SolidBrush(Color.White), outline, New Point(90, Height - 50),
+                        StringAlignment.Near)
 
             If money.getValue() < 100 Then e.Graphics.DrawImage(My.Resources.Warning, New Rectangle(60, Height - 50, 40, 40))
             ' Bankruptcy Warning
@@ -269,7 +252,8 @@ Public Class Form1
 
                 nextButton.AddEllipse(New Rectangle(27, 27 + 4.5 * dayTransition.getValue(), 66, 65))
 
-                If nextButton.IsVisible(MousePosition) And night Then ' Essentially .contains(Point) for graphics paths https://stackoverflow.com/questions/4816297/how-to-know-if-a-graphicspath-contains-a-point-in-c-sharp
+                If nextButton.IsVisible(MousePosition) And night Then ' Essentially .contains(Point) for graphics paths
+                    ' https://stackoverflow.com/questions/4816297/how-to-know-if-a-graphicspath-contains-a-point-in-c-sharp
                     e.Graphics.FillPath(dimBrush, nextButton)
                     If Not mouseLock AndAlso MouseButtons = MouseButtons.Left Then
                         ' Return to day
@@ -277,7 +261,7 @@ Public Class Form1
                             gameObjects.OfType(Of editCauldron).Count < 1 Or ' No cauldrons
                             gameObjects.OfType(Of order).Count < 1 _ ' No parchment
                             Then
-                            gameOver = True ' End game due to bankruptcy
+                            gameOver = True ' End game
                         Else
                             For Each cauldron In gameObjects.OfType(Of editCauldron)
                                 cauldron.transmute()
@@ -392,6 +376,7 @@ Public Class Form1
                         shopOpen = False
                         money.addValue(-price)
                         resetDrag()
+                        My.Computer.Audio.Play(My.Resources.buy, AudioPlayMode.Background)
                         Select Case selectedItem
                             Case 0
                                 newObjects.AddLast(New order(MousePosition, New Point(-125, -15)))
@@ -454,6 +439,7 @@ Public Class Form1
                         shopOpen = False
                         shopX.snapValue(0)
                         dayTransition.setValue(20)
+                        My.Computer.Audio.Play(My.Resources.night, AudioPlayMode.Background)
                         For Each obj In gameObjects
                             If obj.GetType() = GetType(cauldron) Then ' TODO: Source?
                                 ' Replaces cauldrons with a movable version of themselves during the night
@@ -838,6 +824,9 @@ Public Class potion
                     Next
                 Next
                 Form1.money.addValue(ingredientCount * 20 + bonusValue)
+                My.Computer.Audio.Play(My.Resources.money, AudioPlayMode.Background)
+            Else
+                My.Computer.Audio.Play(My.Resources.fail, AudioPlayMode.Background)
             End If
             selectedOrder.deactivate()
             Form1.deadObjects.AddLast(Me)
@@ -996,8 +985,11 @@ Public Class cauldron
             Case 3
                 historyGraphics.DrawImage(My.Resources.Crystal, New Rectangle(325 + Math.Cos(brewingAngle) * -155 - 15, 150 + Math.Sin(brewingAngle) * 155, 30, 30))
         End Select
-        fallingIngredients.AddLast({ingredient, sprite.Height + 10, 2}) ' TODO: Consider storing as a struct?
+        fallingIngredients.AddLast({ingredient, sprite.Height + 10, 2})
         ' Stored as ingredient type, y offset, and dy (velocity)
+        My.Computer.Audio.Play({My.Resources.bubble1, My.Resources.bubble2, My.Resources.bubble3,
+                               My.Resources.bubble4, My.Resources.bubble5}(Int(Rnd() * 5)), AudioPlayMode.Background)
+        ' Plays one of five different sounds for adding an ingredient
     End Sub
 
     Private Function getBrewTime() As Integer
@@ -1010,9 +1002,15 @@ Public Class cauldron
         If brewStage = -1 Then Return
         Select Case brewStage ' Updating the brew stage
             Case 0
-                If getBrewTime() > Math.Round(totalTime / 3) Then brewStage = 1
+                If getBrewTime() > Math.Round(totalTime / 3) Then
+                    brewStage = 1
+                    My.Computer.Audio.Play(My.Resources.brewStage, AudioPlayMode.Background)
+                End If
             Case 1
-                If getBrewTime() > Math.Round(2 * totalTime / 3) Then brewStage = 2
+                If getBrewTime() > Math.Round(2 * totalTime / 3) Then
+                    brewStage = 2
+                    My.Computer.Audio.Play(My.Resources.brewStage, AudioPlayMode.Background)
+                End If
         End Select
     End Sub
 
@@ -1095,6 +1093,7 @@ Public Class cauldron
                             potionMenuActive = False
                             brewStage = -1
                             setupHistory()
+                            My.Computer.Audio.Play(My.Resources.bottle, AudioPlayMode.Background)
                         End If
                     End If
                 End If
@@ -1270,6 +1269,7 @@ Public Class editCauldron
                         Form1.money.addValue(price) ' TODO: Change sell prices (both for types and isNew)
                         Form1.grabLock = False
                         Form1.deadObjects.AddLast(Me)
+                        My.Computer.Audio.Play(My.Resources.money, AudioPlayMode.Background)
                     End If
                     sellPen.Dispose()
                 End If
@@ -1342,6 +1342,7 @@ Public Class order
         timerStart = DateTime.Now
         createOrderImg()
         orderHeight.setValue(275)
+        My.Computer.Audio.Play(My.Resources.orderUp, AudioPlayMode.Background)
     End Sub
 
     Public Overrides Sub deactivate()
@@ -1449,6 +1450,7 @@ Public Class order
                         Form1.money.addValue(price)
                         Form1.grabLock = False
                         Form1.deadObjects.AddLast(Me)
+                        My.Computer.Audio.Play(My.Resources.money, AudioPlayMode.Background)
                     End If
                     sellPen.Dispose()
                 End If

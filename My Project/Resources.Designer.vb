@@ -71,6 +71,15 @@ Namespace My.Resources
         End Property
         
         '''<summary>
+        '''  Looks up a localized resource of type System.IO.UnmanagedMemoryStream similar to System.IO.MemoryStream.
+        '''</summary>
+        Friend ReadOnly Property bottle() As System.IO.UnmanagedMemoryStream
+            Get
+                Return ResourceManager.GetStream("bottle", resourceCulture)
+            End Get
+        End Property
+        
+        '''<summary>
         '''  Looks up a localized resource of type System.Drawing.Bitmap.
         '''</summary>
         Friend ReadOnly Property BrewDial() As System.Drawing.Bitmap
@@ -87,6 +96,69 @@ Namespace My.Resources
             Get
                 Dim obj As Object = ResourceManager.GetObject("BrewDialArrow", resourceCulture)
                 Return CType(obj,System.Drawing.Bitmap)
+            End Get
+        End Property
+        
+        '''<summary>
+        '''  Looks up a localized resource of type System.IO.UnmanagedMemoryStream similar to System.IO.MemoryStream.
+        '''</summary>
+        Friend ReadOnly Property brewStage() As System.IO.UnmanagedMemoryStream
+            Get
+                Return ResourceManager.GetStream("brewStage", resourceCulture)
+            End Get
+        End Property
+        
+        '''<summary>
+        '''  Looks up a localized resource of type System.IO.UnmanagedMemoryStream similar to System.IO.MemoryStream.
+        '''</summary>
+        Friend ReadOnly Property bubble1() As System.IO.UnmanagedMemoryStream
+            Get
+                Return ResourceManager.GetStream("bubble1", resourceCulture)
+            End Get
+        End Property
+        
+        '''<summary>
+        '''  Looks up a localized resource of type System.IO.UnmanagedMemoryStream similar to System.IO.MemoryStream.
+        '''</summary>
+        Friend ReadOnly Property bubble2() As System.IO.UnmanagedMemoryStream
+            Get
+                Return ResourceManager.GetStream("bubble2", resourceCulture)
+            End Get
+        End Property
+        
+        '''<summary>
+        '''  Looks up a localized resource of type System.IO.UnmanagedMemoryStream similar to System.IO.MemoryStream.
+        '''</summary>
+        Friend ReadOnly Property bubble3() As System.IO.UnmanagedMemoryStream
+            Get
+                Return ResourceManager.GetStream("bubble3", resourceCulture)
+            End Get
+        End Property
+        
+        '''<summary>
+        '''  Looks up a localized resource of type System.IO.UnmanagedMemoryStream similar to System.IO.MemoryStream.
+        '''</summary>
+        Friend ReadOnly Property bubble4() As System.IO.UnmanagedMemoryStream
+            Get
+                Return ResourceManager.GetStream("bubble4", resourceCulture)
+            End Get
+        End Property
+        
+        '''<summary>
+        '''  Looks up a localized resource of type System.IO.UnmanagedMemoryStream similar to System.IO.MemoryStream.
+        '''</summary>
+        Friend ReadOnly Property bubble5() As System.IO.UnmanagedMemoryStream
+            Get
+                Return ResourceManager.GetStream("bubble5", resourceCulture)
+            End Get
+        End Property
+        
+        '''<summary>
+        '''  Looks up a localized resource of type System.IO.UnmanagedMemoryStream similar to System.IO.MemoryStream.
+        '''</summary>
+        Friend ReadOnly Property buy() As System.IO.UnmanagedMemoryStream
+            Get
+                Return ResourceManager.GetStream("buy", resourceCulture)
             End Get
         End Property
         
@@ -171,6 +243,15 @@ Namespace My.Resources
         End Property
         
         '''<summary>
+        '''  Looks up a localized resource of type System.IO.UnmanagedMemoryStream similar to System.IO.MemoryStream.
+        '''</summary>
+        Friend ReadOnly Property fail() As System.IO.UnmanagedMemoryStream
+            Get
+                Return ResourceManager.GetStream("fail", resourceCulture)
+            End Get
+        End Property
+        
+        '''<summary>
         '''  Looks up a localized resource of type System.Drawing.Bitmap.
         '''</summary>
         Friend ReadOnly Property GameOver() As System.Drawing.Bitmap
@@ -197,6 +278,15 @@ Namespace My.Resources
             Get
                 Dim obj As Object = ResourceManager.GetObject("Herb", resourceCulture)
                 Return CType(obj,System.Drawing.Bitmap)
+            End Get
+        End Property
+        
+        '''<summary>
+        '''  Looks up a localized resource of type System.IO.UnmanagedMemoryStream similar to System.IO.MemoryStream.
+        '''</summary>
+        Friend ReadOnly Property money() As System.IO.UnmanagedMemoryStream
+            Get
+                Return ResourceManager.GetStream("money", resourceCulture)
             End Get
         End Property
         
@@ -231,6 +321,15 @@ Namespace My.Resources
         End Property
         
         '''<summary>
+        '''  Looks up a localized resource of type System.IO.UnmanagedMemoryStream similar to System.IO.MemoryStream.
+        '''</summary>
+        Friend ReadOnly Property night() As System.IO.UnmanagedMemoryStream
+            Get
+                Return ResourceManager.GetStream("night", resourceCulture)
+            End Get
+        End Property
+        
+        '''<summary>
         '''  Looks up a localized resource of type System.Drawing.Bitmap.
         '''</summary>
         Friend ReadOnly Property OrderBackground() As System.Drawing.Bitmap
@@ -247,6 +346,15 @@ Namespace My.Resources
             Get
                 Dim obj As Object = ResourceManager.GetObject("OrderShop", resourceCulture)
                 Return CType(obj,System.Drawing.Bitmap)
+            End Get
+        End Property
+        
+        '''<summary>
+        '''  Looks up a localized resource of type System.IO.UnmanagedMemoryStream similar to System.IO.MemoryStream.
+        '''</summary>
+        Friend ReadOnly Property orderUp() As System.IO.UnmanagedMemoryStream
+            Get
+                Return ResourceManager.GetStream("orderUp", resourceCulture)
             End Get
         End Property
         
