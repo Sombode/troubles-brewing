@@ -20,9 +20,10 @@ Public Class Form1
     Public day As Integer
     Public ordersDone As Integer ' Secretly kept for scoring
     Public gameOver As Boolean
-    Public money As animatedValue = New animatedValue(100)
+    Public money As animatedValue = New animatedValue(10000)
     Public dayTransition As animatedValue = New animatedValue(0)
     Dim score As Integer = -1
+    Dim highScore As Integer
     Dim shopX As animatedValue = New animatedValue(0)
     Dim shopOpen, titleOpen As Boolean
     Dim dayStart As DateTime
@@ -101,6 +102,7 @@ Public Class Form1
         For i = 1 To gameObjects.OfType(Of order).Count()
             assetsValue += 50 * (2 ^ (i - 1))
         Next
+        money.snap()
         outlineText(g, "Balance", pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 - 50, 230), StringAlignment.Far)
         outlineText(g, Str(money.getValue()).Trim(), pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 + 50, 230), StringAlignment.Near) ' TODO: MONEY CAN BE CAUGHT IN THE MIDDLE OF TRANSITION
         outlineText(g, "Liquidated Assets", pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 - 50, 270), StringAlignment.Far)
@@ -112,13 +114,32 @@ Public Class Form1
 
         If score = -1 Then ' Generates score only if it wasn't already set (as this sub renders each tick)
             score = money.getValue() + assetsValue + orderBonus + dayBonus
-            ' High scoring?
+            ' High score system
+            ' https://learn.microsoft.com/en-us/dotnet/visual-basic/developing-apps/programming/drives-directories-files/how-to-read-from-text-files
+            Try
+                Dim scorePath As String = Application.StartupPath.Replace("bin\Debug", "Resources\savedscores.txt")
+                If Not File.Exists(scorePath) Then
+                    ' If no previous high score exists, create the file
+                    File.Create(scorePath)
+                    My.Computer.FileSystem.WriteAllText(scorePath, Str(score), False)
+                    highScore = score
+                Else
+                    ' Read and compare the high score to the current score
+                    highScore = (Val(My.Computer.FileSystem.ReadAllText(scorePath)))
+                    If highScore < score Then
+                        My.Computer.FileSystem.WriteAllText(scorePath, Str(score), False)
+                        highScore = score
+                    End If
+                End If
+            Catch ex As Exception
+                outlineText(g, "Couldn't load high scores.", pfc.Families(0), 30, Brushes.Red, outline, New Point(20, Height - 30), StringAlignment.Near)
+            End Try
         End If
 
-        outlineText(g, "Total Score", pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 - 50, 500), StringAlignment.Far)
+            outlineText(g, "Total Score", pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 - 50, 500), StringAlignment.Far)
         outlineText(g, Str(score).Trim(), pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 + 50, 500), StringAlignment.Near)
         outlineText(g, "High Score", pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 - 50, 540), StringAlignment.Far)
-        outlineText(g, Str(score).Trim(), pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 + 50, 540), StringAlignment.Near)
+        outlineText(g, Str(highScore).Trim(), pfc.Families(0), 30, Brushes.White, outline, New Point(Width / 2 + 50, 540), StringAlignment.Near)
 
         outline.Dispose()
         ' Replay/Exit Buttons
@@ -248,11 +269,14 @@ Public Class Form1
 
                 nextButton.AddEllipse(New Rectangle(27, 27 + 4.5 * dayTransition.getValue(), 66, 65))
 
-                If nextButton.IsVisible(MousePosition) Then ' Essentially .contains(Point) for graphics paths https://stackoverflow.com/questions/4816297/how-to-know-if-a-graphicspath-contains-a-point-in-c-sharp
+                If nextButton.IsVisible(MousePosition) And night Then ' Essentially .contains(Point) for graphics paths https://stackoverflow.com/questions/4816297/how-to-know-if-a-graphicspath-contains-a-point-in-c-sharp
                     e.Graphics.FillPath(dimBrush, nextButton)
                     If Not mouseLock AndAlso MouseButtons = MouseButtons.Left Then
                         ' Return to day
-                        If money.getValue() < 100 Then
+                        If money.getValue() < 100 Or ' Bankruptcy
+                            gameObjects.OfType(Of editCauldron).Count < 1 Or ' No cauldrons
+                            gameObjects.OfType(Of order).Count < 1 _ ' No parchment
+                            Then
                             gameOver = True ' End game due to bankruptcy
                         Else
                             For Each cauldron In gameObjects.OfType(Of editCauldron)
@@ -273,8 +297,10 @@ Public Class Form1
 
                 e.Graphics.DrawImage(My.Resources.NextIcon, New Rectangle(27, 27 + 4.5 * dayTransition.getValue(), 66, 65))
 
-                If money.getValue() < 100 Then e.Graphics.DrawImage(My.Resources.Warning, New Rectangle(60, 60 + 4.5 * dayTransition.getValue(), 40, 40))
-                ' Bankruptcy Warning
+                If money.getValue() < 100 Or ' Bankruptcy warning
+                    (gameObjects.OfType(Of editCauldron).Count < 1 And night) Or ' No cauldrons warning
+                    gameObjects.OfType(Of order).Count < 1 _ ' No parchment warning
+                    Then e.Graphics.DrawImage(My.Resources.Warning, New Rectangle(60, 60 + 4.5 * dayTransition.getValue(), 40, 40))
 
                 ' Shop UI
 
@@ -370,9 +396,9 @@ Public Class Form1
                             Case 0
                                 newObjects.AddLast(New order(MousePosition, New Point(-125, -15)))
                             Case 1
-                                newObjects.AddLast(New editCauldron(MousePosition, My.Resources.Cauldron, New Point(-125, -100), 3))
+                                newObjects.AddLast(New editCauldron(MousePosition, My.Resources.Cauldron, New Point(-125, -100), 1))
                             Case 2
-                                newObjects.AddLast(New editCauldron(MousePosition, My.Resources.CopperCauldron, New Point(-125, -100), 3))
+                                newObjects.AddLast(New editCauldron(MousePosition, My.Resources.CopperCauldron, New Point(-125, -100), 2))
                             Case 3
                                 newObjects.AddLast(New editCauldron(MousePosition, My.Resources.GoldCauldron, New Point(-125, -100), 3))
                         End Select
@@ -656,6 +682,7 @@ Public Class animatedValue ' An object that can interpolate between two values f
     End Sub
 
     Public Function updateValue() As Single
+        ' Updates the value, progressing through the transition
         If frame >= duration Then
             done = True
             Return value
@@ -672,6 +699,7 @@ Public Class animatedValue ' An object that can interpolate between two values f
     End Function
 
     Public Sub setValue(target As Single)
+        ' Sets the number to transition toward
         If targetValue = target Then Return ' Do nothing if the value is already moving to the correct value
         done = False
         originalValue = value
@@ -681,6 +709,7 @@ Public Class animatedValue ' An object that can interpolate between two values f
     End Sub
 
     Public Sub snapValue(target As Single)
+        ' Directly sets the value to a certain number, without transitions
         frame = duration
         value = target
         originalValue = target
@@ -689,12 +718,21 @@ Public Class animatedValue ' An object that can interpolate between two values f
     End Sub
 
     Public Sub addValue(number As Single)
+        ' Adds a value to the number
         If frame < duration Then value = targetValue ' In case the function is spammed added values don't get lost in transition
         done = False
         originalValue = value
         difference = number
         targetValue = value + difference
         frame = 0
+    End Sub
+
+    Public Sub snap()
+        ' Skips all transitions in case the true value is needed
+        frame = duration
+        value = targetValue
+        originalValue = value
+        done = True
     End Sub
 
 End Class
@@ -1216,13 +1254,24 @@ Public Class editCauldron
                     Dim sellPen As Pen = New Pen(Color.Black, 8)
                     sellPen.LineJoin = LineJoin.Bevel
                     grabPrimed = False ' As tick happens before render, grabPrimed is set to false here so that clicking the sell button takes priority over being grabbed
+                    Dim price As Integer
+                    Select Case type ' TODO: MOVE LINK (BELOW) TO FIRST INSTANCE OF SELECT CASE
+                        Case 1
+                            price = 1000
+                        Case 2
+                            price = 2500
+                        Case 3
+                            price = 5000
+                    End Select
+                    If Not isNew Then price *= 0.75 ' Used cauldrons from the previous day don't give a full refund
                     g.FillEllipse(selectedBackground, sellRect)
-                    Form1.outlineText(g, "$800", Form1.pfc.Families(0), 40, Brushes.White, sellPen, New Point(x + 30 + sprite.Width / 2, y + 50 + sprite.Height / 2), StringAlignment.Near)
+                    Form1.outlineText(g, FormatCurrency(price, 0), Form1.pfc.Families(0), 40, Brushes.White, sellPen, New Point(x + 30 + sprite.Width / 2, y + 50 + sprite.Height / 2), StringAlignment.Near)
                     If Not Form1.mouseLock AndAlso Form1.MouseButtons = MouseButtons.Left Then
-                        Form1.money.addValue(800) ' TODO: Change sell prices (both for types and isNew)
+                        Form1.money.addValue(price) ' TODO: Change sell prices (both for types and isNew)
                         Form1.grabLock = False
                         Form1.deadObjects.AddLast(Me)
                     End If
+                    sellPen.Dispose()
                 End If
                 g.DrawImage(My.Resources.SellIcon, sellRect)
             End If
@@ -1242,7 +1291,7 @@ Public Class order
     Dim cooldown As Integer
     Dim orderOpen As Boolean ' Kept independently of potion-hovering effects (which can temporarily open an order)
     Dim orderHeight As animatedValue = New animatedValue(40)
-    Dim active As Boolean
+    Dim active, isNew As Boolean
     Dim orderImg As Bitmap
     Public recipe(0 To 2, 0 To 3) As Integer
     Public potionHover As Boolean
@@ -1272,7 +1321,7 @@ Public Class order
         orderHeight.duration = 5
         orderHeight.snapValue(0)
         orderImg = New Bitmap(219, 268) ' Just sets it as a blank bitmap so that rendering doesn't throw issues (will be updated when the day starts)
-
+        isNew = True
         Randomize()
     End Sub
 
@@ -1300,6 +1349,7 @@ Public Class order
         orderHeight.setValue(0)
         cooldown = getTimer()
         timerStart = DateTime.Now
+        isNew = False
     End Sub
 
     Public Function getPaperRect() As Rectangle
@@ -1381,14 +1431,40 @@ Public Class order
 
         MyBase.render(g)
 
-        If Form1.night Then Return
+        If Form1.night Then
+            Dim iconBackground As SolidBrush = New SolidBrush(Color.FromArgb(200, 10, 10, 10))
+            Dim selectedBackground As SolidBrush = New SolidBrush(Color.FromArgb(200, 200, 200, 200))
+            Dim sellRect As Rectangle = New Rectangle(x - 30 + sprite.Width / 2, y + 20 + sprite.Height / 2, 60, 60)
+            If Not grabbed Then
+                g.FillEllipse(iconBackground, sellRect)
+                If sellRect.Contains(Form1.MousePosition) Then
+                    Dim sellPen As Pen = New Pen(Color.Black, 8)
+                    Dim price As Integer = 50 * (2 ^ (Form1.gameObjects.OfType(Of order).Count() - 1))
+                    If Not isNew Then price *= 0.75
+                    sellPen.LineJoin = LineJoin.Bevel
+                    grabPrimed = False ' As tick happens before render, grabPrimed is set to false here so that clicking the sell button takes priority over being grabbed
+                    g.FillEllipse(selectedBackground, sellRect)
+                    Form1.outlineText(g, FormatCurrency(price, 0), Form1.pfc.Families(0), 40, Brushes.White, sellPen, New Point(x + 30 + sprite.Width / 2, y + 50 + sprite.Height / 2), StringAlignment.Near)
+                    If Not Form1.mouseLock AndAlso Form1.MouseButtons = MouseButtons.Left Then
+                        Form1.money.addValue(price)
+                        Form1.grabLock = False
+                        Form1.deadObjects.AddLast(Me)
+                    End If
+                    sellPen.Dispose()
+                End If
+                g.DrawImage(My.Resources.SellIcon, sellRect)
+            End If
+            iconBackground.Dispose()
+            selectedBackground.Dispose()
+            Return
+        End If
 
         Dim timerBrush As SolidBrush = New SolidBrush(Color.FromArgb(148, 72, 208))
 
         If active Then
             Form1.cleanArc(g, timerBrush, x + sprite.Width / 2, y + 8 + sprite.Height / 2, 33, 21, 180, Math.Min(getTimer() / duration * 180, 180))
 
-            If getTimer() - 3000 > duration Then deactivate()
+            If getTimer() > duration Then deactivate()
         Else
             Form1.cleanArc(g, timerBrush, x + sprite.Width / 2, y + 8 + sprite.Height / 2, 33, 21, 180, Math.Max((cooldown - getTimer() * 2) / duration * 180, 0))
 
