@@ -14,7 +14,7 @@ Public Class Form1
     Public gameObjects As LinkedList(Of GameObject) ' The main list of game objects (to loop through and tick/render them)
     Public newObjects, deadObjects As LinkedList(Of GameObject) ' Lists that will be used to modify gameObjects after iteration
     ' (as the direct list cannot be modified during iteration)
-    Public mouseLock, grabLock, night As Boolean
+    Public mouseLock, grabLock, hoverGrab, night As Boolean
     Public day As Integer
     Public ordersDone As Integer ' Secretly kept for scoring
     Public gameOver As Boolean
@@ -40,6 +40,7 @@ Public Class Form1
         grabLock = False
         gameOver = False
         night = False
+        hoverGrab = False
         titleOpen = True
         ordersDone = 0
         day = 1
@@ -48,6 +49,7 @@ Public Class Form1
     Private Sub tick()
         ' Tick simply runs before render, allowing objects to all update before they are rendered (not really used to its fullest extent in this game)
         If mouseLock AndAlso (MouseButtons = MouseButtons.None) Then mouseLock = False
+        hoverGrab = False ' Used to prevent cauldron interaction if the player is hovering over a grabbable object (already does, but makes it more clear)
         For Each gameObj In gameObjects
             gameObj.tick()
         Next
@@ -570,6 +572,7 @@ Public Class Draggable ' A class based off of gameObject with additional functio
         Else
             If Form1.grabLock Then Return ' Prevents multiple items from being grabbed at once
             If getBounds().Contains(Form1.MousePosition) Then
+                Form1.hoverGrab = True
                 If Form1.MouseButtons = MouseButtons.Left Then
                     If grabPrimed Then
                         grabbed = True
@@ -978,7 +981,7 @@ Public Class Cauldron
             g.DrawImage(arrow, -CInt(arrow.Width / 2) + 1, -22, arrow.Width, arrow.Height)
             g.ResetTransform()
         End If
-        If Form1.grabLock Then Return ' Don't render/handle cauldron interactions if something is grabbed/dragged
+        If Form1.grabLock Or Form1.hoverGrab Then Return ' Don't render/handle cauldron interactions if something is grabbed/dragged
         If getBounds().Contains(Form1.MousePosition) Then
             Dim mouseDist = Math.Sqrt((centerX - Form1.MousePosition.X) ^ 2 + (centerY - Form1.MousePosition.Y) ^ 2)
             If Not brewStage = -1 Then g.FillEllipse(darkBrush, centerX - 30, centerY - 30, 60, 60)
