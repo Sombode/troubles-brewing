@@ -7,6 +7,7 @@ Imports System.Drawing.Drawing2D
 Imports System.Drawing.Imaging
 Imports System.Drawing.Text
 Imports System.IO
+Imports System.Runtime.InteropServices
 
 
 Public Class Form1
@@ -30,8 +31,12 @@ Public Class Form1
     ' https://stackoverflow.com/questions/13573916/using-custom-fonts-in-my-winform-labels
 
     Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
-        pfc.AddFontFile(Application.StartupPath.Replace("bin\Debug", "Resources\GermaniaOne-Regular.ttf")) ' An objectively bad way to import a custom font,
-        ' but it works (as long as the project stays unpackaged) and I don't have to touch pointers (the alternative is AddMemoryFont, which is too complex).
+        ' Importing a custom font (changed from before, now using addMemoryFont instead of addFontFile to access an embedded font file):
+        ' http://thinkofdotnet.blogspot.com/2012/04/vbnet-include-font-as-embedded-resource.html
+        Dim fontPointer As IntPtr = Marshal.AllocCoTaskMem(My.Resources.GermaniaOne_Regular.Length) ' Allocating memory to copy the font file to
+        Marshal.Copy(My.Resources.GermaniaOne_Regular, 0, fontPointer, My.Resources.GermaniaOne_Regular.Length) ' Copying the font file's data to that memory
+        pfc.AddMemoryFont(fontPointer, My.Resources.GermaniaOne_Regular.Length) ' Adding the font to the private font collection (see above) from memory
+        Marshal.FreeCoTaskMem(fontPointer) ' Freeing up the allocated memory
         Randomize()
         gameObjects = New LinkedList(Of GameObject)
         newObjects = New LinkedList(Of GameObject)
@@ -107,7 +112,7 @@ Public Class Form1
             ' High score system
             ' https://learn.microsoft.com/en-us/dotnet/visual-basic/developing-apps/programming/drives-directories-files/how-to-read-from-text-files
             Try
-                Dim scorePath As String = Application.StartupPath.Replace("bin\Debug", "Resources\savedscores.txt")
+                Dim scorePath As String = Application.StartupPath + "\troublesbrewingscores.txt"
                 If Not File.Exists(scorePath) Then
                     ' If no previous high score exists, create the file
                     File.Create(scorePath)
