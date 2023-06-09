@@ -402,6 +402,7 @@ Public Class Form1
                         shopX.snapValue(0)
                         dayTransition.setValue(20)
                         My.Computer.Audio.Play(My.Resources.night, AudioPlayMode.Background)
+                        resetDrag()
                         For Each obj In gameObjects
                             If obj.GetType() = GetType(Cauldron) Then
                                 ' Replaces cauldrons with a movable version of themselves during the night
@@ -980,6 +981,14 @@ Public Class Cauldron
         If Not brewStage = -1 Then
             Dim dial = My.Resources.BrewDial
             Dim arrow = My.Resources.BrewDialArrow
+            Select Case brewStage
+                Case 0
+                    g.DrawImage(My.Resources.GreenArrow, New Rectangle(x + 50, y - 80, 145, 68))
+                Case 1
+                    g.DrawImage(My.Resources.YellowArrow, New Rectangle(x + 50, y - 80, 145, 68))
+                Case 2
+                    g.DrawImage(My.Resources.RedArrow, New Rectangle(x + 50, y - 80, 145, 68))
+            End Select
             g.DrawImage(dial, x + 82, y - 55, 86, 40)
             g.TranslateTransform(centerX, y - 25)
             g.RotateTransform(Math.Min(getBrewTime() * 180 / totalTime, 190) - 90) ' Uses Math.Min to stop the arrow from going past the dial's end

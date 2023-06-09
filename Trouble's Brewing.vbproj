@@ -300,5 +300,23 @@
       <Install>false</Install>
     </BootstrapperPackage>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\Frame 49.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\Frame 50.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\Frame 51.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\GreenArrow.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\RedArrow.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\YellowArrow.png" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
 </Project>
