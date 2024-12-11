@@ -6,7 +6,7 @@ In the game, you play as an amateur alchemist selling potions, brewing concoctio
 
 # Usage
 
-Either download the runnable .exe file from the most recent release to play, or download the whole repository and open it with Visual Studio to edit the code.
+Either download the runnable .exe file from the [most recent release](https://github.com/Sombode/troubles-brewing/releases/tag/v1.0.0) to play, or download the whole repository and open it with Visual Studio to edit the code.
 
 # Gameplay Guide
 
