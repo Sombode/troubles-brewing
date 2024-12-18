@@ -4,6 +4,8 @@ Trouble's Brewing is a small game developed as the end-of-year project for a hig
 
 In the game, you play as an amateur alchemist selling potions, brewing concoctions to match customer specifications for profit. A more detailed, [visual guide can be found below](#gameplay-guide).
 
+![Screenshot 2024-12-18 013525](https://github.com/user-attachments/assets/7bfa2b52-21c8-4288-9dd4-842dbb94c87f)
+
 # Usage
 
 Either download the runnable .exe file from the [most recent release](https://github.com/Sombode/troubles-brewing/releases/tag/v1.0.0) to play, or download the whole repository and open it with Visual Studio to edit the code.
